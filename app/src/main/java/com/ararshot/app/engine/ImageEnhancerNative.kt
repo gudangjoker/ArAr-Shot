@@ -118,32 +118,56 @@ object ImageEnhancerNative {
     }
 
     /**
-     * Upscale an input bitmap using Real-ESRGAN (or mathematical bicubic fallback).
+     * General image enhancement supporting Super-Resolution, Bilateral Denoise, Unsharp Mask, and Combined Ultra.
      */
-    fun upscaleImage(input: Bitmap, strength: Float = 0.8f): Bitmap {
+    fun enhanceImage(input: Bitmap, mode: Int = MODE_SUPER_RESOLUTION, strength: Float = 0.8f): Bitmap {
         ensureNativeLoaded()
         val width = input.width
         val height = input.height
         val inPixels = IntArray(width * height)
         input.getPixels(inPixels, 0, width, 0, 0, width, height)
 
-        val outPixels = if (isNativeLibraryLoaded) {
-            try {
-                processTileNative(inPixels, width, height, MODE_SUPER_RESOLUTION, strength)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Native processTileNative call failed: ${t.message}")
+        val isSuperRes = (mode == MODE_SUPER_RESOLUTION || mode == MODE_COMBINED_ENHANCE)
+
+        return try {
+            val processedPixels = if (isNativeLibraryLoaded) {
+                if (mode == MODE_COMBINED_ENHANCE) {
+                    // Step 1: Bilateral Denoise
+                    val denoised = processTileNative(inPixels, width, height, MODE_BILATERAL_DENOISE, strength)
+                    // Step 2: 4x Super-Resolution
+                    if (denoised != null && denoised.size == width * height) {
+                        processTileNative(denoised, width, height, MODE_SUPER_RESOLUTION, strength)
+                    } else {
+                        processTileNative(inPixels, width, height, MODE_SUPER_RESOLUTION, strength)
+                    }
+                } else {
+                    processTileNative(inPixels, width, height, mode, strength)
+                }
+            } else {
                 inPixels
             }
-        } else {
-            inPixels
-        }
 
-        val outW = width * 4
-        val outH = height * 4
-        val outBitmap = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
-        if (outPixels.size == outW * outH) {
-            outBitmap.setPixels(outPixels, 0, outW, 0, 0, outW, outH)
+            val outW = if (isSuperRes) width * 4 else width
+            val outH = if (isSuperRes) height * 4 else height
+
+            if (processedPixels != null && processedPixels.size == outW * outH) {
+                val outBitmap = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(processedPixels, 0, outW, 0, 0, outW, outH)
+                outBitmap
+            } else {
+                Log.w(TAG, "Processed pixels size mismatch, returning original bitmap.")
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "Error in enhanceImage: ${t.message}", t)
+            input
         }
-        return outBitmap
+    }
+
+    /**
+     * Upscale an input bitmap using Real-ESRGAN (or mathematical bicubic fallback).
+     */
+    fun upscaleImage(input: Bitmap, strength: Float = 0.8f): Bitmap {
+        return enhanceImage(input, MODE_SUPER_RESOLUTION, strength)
     }
 }

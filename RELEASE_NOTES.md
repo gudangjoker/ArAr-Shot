@@ -1,6 +1,6 @@
-# 📸 ArAr Shot v.1.0.2 — Release Notes
+# 📸 ArAr Shot v.1.0.3 — Release Notes
 
-## Versi 1.0.2 (ArAr Shot v.1.0.2 Personal Offline Release)
+## Versi 1.0.3 (ArAr Shot v.1.0.3 Interactive Photo Enhancer Release)
 **Tanggal Rilis**: 14 Oktober 2026  
 **Package Name**: `com.ararshot.app`  
 **Tipe Rilis**: Edisi Pribadi (Offline Standalone Build)  
@@ -9,7 +9,17 @@
 ---
 
 ### ✨ Ringkasan Rilis
-ArAr Shot v.1.0.2 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardware penuh untuk aplikasi peningkatan kualitas foto (*photo enhancer & super-resolution*) bertenaga AI lokal. Dilengkapi dengan logo kamera futuristik, inisialisasi engine lazy (bebas crash), penamaan file rilis langsung `ArAr-Shot-v.1.0.2.apk`, dan kenaikan version code (code: 3) untuk mencegah benturan cache instalasi Android.
+ArAr Shot v.1.0.3 menghadirkan **Antarmuka Interaktif Lengkap Peningkatan Foto**:
+1. **Pemilih Foto (Gallery Picker)**: Pilih foto mana pun dari galeri perangkat Anda secara langsung.
+2. **Kamera Terintegrasi**: Ambil foto baru langsung dari dalam aplikasi.
+3. **Multi-Mode AI & Native Enhancer**:
+   - ✨ **4x Super-Resolution**: Meningkatkan resolusi 4x lipat menggunakan model AI Real-ESRGAN NCNN Vulkan.
+   - 🚀 **Ultra Enhance**: Kombinasi Bilateral Denoise dan 4x Super-Resolution.
+   - 🔍 **Pertajam Detail**: Filter Unsharp Masking berpresisi tinggi.
+   - 🧼 **Bersihkan Noise**: Algoritma Bilateral Denoising pereduksi bintik foto.
+4. **Perbandingan Langsung (Before & After Tabs)**: Bandingkan foto asli vs foto hasil peningkatan AI dengan satu sentuhan.
+5. **Simpan ke Galeri**: Simpan hasil foto beresolusi tinggi langsung ke folder `Pictures/ArArShot` di penyimpanan HP.
+6. **Indikator Proses Visual**: Menampilkan animasi pemrosesan aktif saat AI sedang merekonstruksi piksel foto.
 
 ---
 
@@ -56,7 +66,7 @@ ArAr Shot v.1.0.2 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardw
 
 | Parameter | Spesifikasi |
 | :--- | :--- |
-| **Versi Aplikasi** | `1.0.2` (Version Code: `3`) |
+| **Versi Aplikasi** | `1.0.3` (Version Code: `4`) |
 | **Target SDK** | Android 14 (API Level 34) |
 | **Minimum SDK** | Android 7.0 Nougat (API Level 24) |
 | **Arsitektur CPU (ABI)** | `arm64-v8a` (64-bit modern), `armeabi-v7a` (32-bit legacy), `x86_64` |
@@ -68,8 +78,6 @@ ArAr Shot v.1.0.2 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardw
 
 ### 📲 Panduan Instalasi di Ponsel Android
 
-1. Unduh file **`ArAr-Shot-v.1.0.2.apk`** (atau `ArAr-Shot-v.1.0.2-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
-2. Pindahkan file `.apk` ke ponsel Android Anda (atau download langsung melalui browser ponsel).
-3. Buka/Tap file `ArAr-Shot-v.1.0.2.apk` di ponsel Anda untuk memulai proses pemasangan:
-   - Jika muncul peringatan *"Install unknown apps / Sumber tidak dikenal"*, pilih **Izinkan (Allow)**.
-4. Selesai! Aplikasi langsung dapat dibuka dan digunakan dengan logo kamera futuristik terbaru tanpa koneksi internet.
+1. Unduh berkas **`ArAr-Shot-v.1.0.3.apk`** (atau `ArAr-Shot-v.1.0.3-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
+2. Buka/Pasang berkas `ArAr-Shot-v.1.0.3.apk` di ponsel Anda.
+3. Langsung pilih foto dari galeri atau foto kamera untuk memulai peningkatan kualitas foto dengan AI!
