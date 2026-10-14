@@ -6,7 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,24 +21,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,13 +51,32 @@ import com.ararshot.app.engine.ImageEnhancerNative
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val isModelInitialized = mutableStateOf(false)
+    private val initErrorMessage = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Install Global Uncaught Exception Handler to capture any unexpected device crash
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                Log.e("ArArShotCrash", "FATAL CRASH on thread ${thread.name}: ${throwable.message}", throwable)
+                val crashFile = File(filesDir, "crash_log.txt")
+                val sw = StringWriter()
+                throwable.printStackTrace(PrintWriter(sw))
+                crashFile.writeText("Time: ${System.currentTimeMillis()}\nThread: ${thread.name}\n${sw}\n")
+            } catch (e: Exception) {
+                Log.e("ArArShotCrash", "Failed to write crash log: ${e.message}")
+            }
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
 
         try {
             setContent {
@@ -66,6 +87,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         ArArShotApp(
                             isModelReady = isModelInitialized.value,
+                            errorMessage = initErrorMessage.value,
                             onInitRequested = {
                                 lifecycleScope.launch(Dispatchers.IO) {
                                     try {
@@ -73,10 +95,16 @@ class MainActivity : ComponentActivity() {
                                         val success = ImageEnhancerNative.initModels(applicationContext)
                                         withContext(Dispatchers.Main) {
                                             isModelInitialized.value = success
+                                            if (!success) {
+                                                initErrorMessage.value = "Hardware Fallback Active (Vulkan/NCNN CPU Mode)"
+                                            }
                                             Log.d("MainActivity", "Model ready = $success")
                                         }
                                     } catch (t: Throwable) {
                                         Log.e("MainActivity", "Error during model init: ${t.message}", t)
+                                        withContext(Dispatchers.Main) {
+                                            initErrorMessage.value = "Init error: ${t.localizedMessage ?: t.message}"
+                                        }
                                     }
                                 }
                             }
@@ -91,7 +119,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ArArShotApp(isModelReady: Boolean, onInitRequested: () -> Unit = {}) {
+fun ArArShotApp(
+    isModelReady: Boolean,
+    errorMessage: String? = null,
+    onInitRequested: () -> Unit = {}
+) {
     val context = LocalContext.current
 
     // Determine required permissions based on Android SDK level
@@ -145,9 +177,7 @@ fun ArArShotApp(isModelReady: Boolean, onInitRequested: () -> Unit = {}) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.app_logo),
-                contentDescription = "Logo ArAr Shot",
+            AppLogoImage(
                 modifier = Modifier
                     .size(96.dp)
                     .clip(RoundedCornerShape(20.dp))
@@ -199,6 +229,14 @@ fun ArArShotApp(isModelReady: Boolean, onInitRequested: () -> Unit = {}) {
                         },
                         fontSize = 14.sp
                     )
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = errorMessage,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
 
@@ -249,6 +287,15 @@ fun ArArShotApp(isModelReady: Boolean, onInitRequested: () -> Unit = {}) {
             }
         }
     }
+}
+
+@Composable
+fun AppLogoImage(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(id = R.drawable.app_logo),
+        contentDescription = "Logo ArAr Shot",
+        modifier = modifier
+    )
 }
 
 @Composable

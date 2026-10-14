@@ -2,6 +2,7 @@
 agp = "8.6.1"
 kotlin = "2.0.20"
 ksp = "2.0.20-1.0.25"
+appcompat = "1.7.0"
 compose-bom = "2024.09.02"
 activity-compose = "1.9.2"
 lifecycle = "2.8.6"
@@ -17,6 +18,7 @@ core-testing = "1.6.1"
 robolectric = "4.13"
 
 [libraries]
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -46,5 +48,6 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

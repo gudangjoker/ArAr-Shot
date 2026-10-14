@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.devtools.ksp)
 }
@@ -41,6 +42,12 @@ android {
 
     androidResources {
         noCompress += listOf("param", "bin", "onnx", "tflite")
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     signingConfigs {
@@ -88,6 +95,7 @@ android {
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)

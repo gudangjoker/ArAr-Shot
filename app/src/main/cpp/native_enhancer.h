@@ -42,6 +42,9 @@ void cosineTileBlend(const uint32_t* tile, int tileW, int tileH, int dstX, int d
 extern "C" {
 #endif
 
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved);
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* reserved);
+
 // JNI signatures for com.ararshot.app.engine.ImageEnhancerNative
 JNIEXPORT jboolean JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(

@@ -4,6 +4,9 @@
 static ncnn::Net* g_net = nullptr;
 static bool g_model_loaded = false;
 static bool g_has_vulkan = false;
+#if NCNN_VULKAN
+static bool g_vulkan_initialized = false;
+#endif
 #endif
 
 static inline uint8_t clamp8(float v) {
@@ -268,13 +271,23 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(
     LOGI("loadModelNative: initializing NCNN with param: %s, bin: %s", param_str, bin_str);
 
 #if NCNN_VULKAN
+    if (!g_vulkan_initialized) {
+        int v_ret = ncnn::create_gpu_instance();
+        g_vulkan_initialized = (v_ret == 0);
+        LOGI("loadModelNative: ncnn::create_gpu_instance() returned %d (vulkan_initialized=%d)", v_ret, g_vulkan_initialized);
+    }
+
     g_has_vulkan = false;
-    int gpu_count = ncnn::get_gpu_count();
-    if (gpu_count > 0) {
-        g_has_vulkan = true;
-        LOGI("loadModelNative: Vulkan compute available (GPU count = %d)", gpu_count);
+    if (g_vulkan_initialized) {
+        int gpu_count = ncnn::get_gpu_count();
+        if (gpu_count > 0) {
+            g_has_vulkan = true;
+            LOGI("loadModelNative: Vulkan compute available (GPU count = %d)", gpu_count);
+        } else {
+            LOGI("loadModelNative: GPU count = 0, using CPU inference");
+        }
     } else {
-        LOGI("loadModelNative: No Vulkan GPU detected, using high-performance CPU inference");
+        LOGI("loadModelNative: Vulkan initialization failed or unsupported, using CPU inference");
     }
 #else
     g_has_vulkan = false;
@@ -288,6 +301,15 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(
     }
 
     g_net->opt.use_vulkan_compute = g_has_vulkan;
+#if NCNN_VULKAN
+    if (g_has_vulkan) {
+        int default_gpu = ncnn::get_default_gpu_index();
+        if (default_gpu >= 0) {
+            g_net->set_vulkan_device(default_gpu);
+            LOGI("loadModelNative: Bound network to Vulkan device index: %d", default_gpu);
+        }
+    }
+#endif
     g_net->opt.num_threads = ncnn::get_big_cpu_count();
     g_net->opt.use_fp16_packed = true;
     g_net->opt.use_fp16_storage = true;
@@ -551,6 +573,33 @@ Java_com_example_engine_ImageEnhancerNative_blendTileNative(
     jint targetH
 ) {
     return Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileNative(env, thiz, tilePixels, tileW, tileH, dstX, dstY, targetPixels, targetW, targetH);
+}
+
+// ---------------------------------------------------------------------------
+// JNI Lifecycle hooks
+// ---------------------------------------------------------------------------
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+    LOGI("JNI_OnLoad: initializing arar_engine native library");
+#if USE_NCNN && NCNN_VULKAN
+    if (!g_vulkan_initialized) {
+        int v_ret = ncnn::create_gpu_instance();
+        g_vulkan_initialized = (v_ret == 0);
+        LOGI("JNI_OnLoad: ncnn::create_gpu_instance() returned %d (vulkan_initialized=%d)", v_ret, g_vulkan_initialized);
+    }
+#endif
+    return JNI_VERSION_1_6;
+}
+
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* reserved) {
+    LOGI("JNI_OnUnload: cleaning up arar_engine native library");
+#if USE_NCNN && NCNN_VULKAN
+    if (g_vulkan_initialized) {
+        ncnn::destroy_gpu_instance();
+        g_vulkan_initialized = false;
+        LOGI("JNI_OnUnload: ncnn::destroy_gpu_instance() executed");
+    }
+#endif
 }
 
 } // extern "C"

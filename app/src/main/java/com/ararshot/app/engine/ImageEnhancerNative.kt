@@ -13,10 +13,21 @@ object ImageEnhancerNative {
     const val MODE_UNSHARP_MASK = 2
     const val MODE_COMBINED_ENHANCE = 3
 
+    @Volatile
     private var isNativeLibraryLoaded = false
+    @Volatile
     private var isModelLoaded = false
+    private var loadAttempted = false
 
-    init {
+    /**
+     * Lazily and safely loads the native C++ libraries (libncnn and libarar_engine).
+     * This avoids any startup class-initialization crashes.
+     */
+    @Synchronized
+    fun ensureNativeLoaded(): Boolean {
+        if (loadAttempted) return isNativeLibraryLoaded
+        loadAttempted = true
+
         // Attempt to load libncnn first (shared dependency on Android)
         try {
             System.loadLibrary("ncnn")
@@ -34,6 +45,8 @@ object ImageEnhancerNative {
             Log.e(TAG, "Failed to load 'arar_engine' native library: ${t.message}")
             isNativeLibraryLoaded = false
         }
+
+        return isNativeLibraryLoaded
     }
 
     fun isNativeLoaded(): Boolean = isNativeLibraryLoaded
@@ -75,7 +88,7 @@ object ImageEnhancerNative {
      * Initializes NCNN Vulkan compute and loads Real-ESRGAN model weights from APK assets.
      */
     fun initModels(context: Context): Boolean {
-        if (!isNativeLibraryLoaded) {
+        if (!ensureNativeLoaded()) {
             Log.w(TAG, "Native library not loaded. Image enhancement will use mathematical fallbacks.")
             return false
         }
@@ -92,7 +105,7 @@ object ImageEnhancerNative {
             if (success) {
                 Log.i(TAG, "Real-ESRGAN NCNN model successfully loaded and ready for inference.")
             } else {
-                Log.w(TAG, "loadModelNative returned false. Bicubic upscale fallback will be used.")
+                Log.w(TAG, "loadModelNative returned false. Mathematical upscale fallback will be used.")
             }
             success
         } catch (t: Throwable) {
@@ -105,13 +118,19 @@ object ImageEnhancerNative {
      * Upscale an input bitmap using Real-ESRGAN (or mathematical bicubic fallback).
      */
     fun upscaleImage(input: Bitmap, strength: Float = 0.8f): Bitmap {
+        ensureNativeLoaded()
         val width = input.width
         val height = input.height
         val inPixels = IntArray(width * height)
         input.getPixels(inPixels, 0, width, 0, 0, width, height)
 
         val outPixels = if (isNativeLibraryLoaded) {
-            processTileNative(inPixels, width, height, MODE_SUPER_RESOLUTION, strength)
+            try {
+                processTileNative(inPixels, width, height, MODE_SUPER_RESOLUTION, strength)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Native processTileNative call failed: ${t.message}")
+                inPixels
+            }
         } else {
             inPixels
         }

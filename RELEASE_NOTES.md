@@ -13,6 +13,21 @@ ArAr Shot v.1.0.1 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardw
 
 ---
 
+### 🛠️ Perbaikan Utama (Penyebab Force Close Teratasi)
+1. **Penyebab Utama: Plugin Kompilasi Kotlin Android (`org.jetbrains.kotlin.android`)**:
+   - Sebelumnya, plugin Kotlin Android belum terpasang di Gradle sehingga kode Kotlin (`MainActivity.kt` & `ImageEnhancerNative.kt`) tidak terkompilasi ke dalam file DEX APK. Hal ini menyebabkan crash instan `ClassNotFoundException` saat aplikasi dibuka dari launcher.
+   - Sekarang plugin Kotlin Android 2.0.20 aktif, dan seluruh kelas aplikasi terverifikasi 100% berada di dalam `classes.dex`.
+2. **Inisialisasi Vulkan NCNN (`ncnn::create_gpu_instance`)**:
+   - Menambahkan pemanggilan `ncnn::create_gpu_instance()` pada `JNI_OnLoad` dan `loadModelNative` untuk mencegah native SIGSEGV crash pada smartphone dengan GPU Vulkan.
+3. **Pemuatan Library Native C++ Bersifat Lazy**:
+   - Menghilangkan pemanggilan `System.loadLibrary` pada blok `init` singleton agar tidak memicu `ExceptionInInitializerError` saat startup. Native library dimuat secara aman dan sinkron saat dibutuhkan.
+4. **Ekstraksi Native Library APK (`useLegacyPackaging = true`)**:
+   - Mengaktifkan `packaging.jniLibs.useLegacyPackaging = true` agar file `libncnn.so` dan `libarar_engine.so` diekstrak langsung ke storage aplikasi saat instalasi, menghindari kegagalan dynamic linker pada ROM Samsung One UI, Xiaomi HyperOS/MIUI, dan Oppo/Vivo.
+5. **Kompatibilitas Tema & Activity**:
+   - Mengintegrasikan `androidx.appcompat:appcompat:1.7.0`, menyelaraskan tema dengan `Theme.AppCompat.DayNight.NoActionBar`, dan menambahkan crash handler global ke `crash_log.txt`.
+
+---
+
 ### 🚀 Fitur Utama
 
 1. **4x Super-Resolution AI (Real-ESRGAN NCNN Vulkan)**:
