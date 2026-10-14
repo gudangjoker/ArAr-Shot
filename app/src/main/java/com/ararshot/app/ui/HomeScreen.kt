@@ -28,12 +28,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.TextFields
@@ -236,10 +242,38 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. Feature Card: AI BACKGROUND REMOVER & REPLACER
+            // 2. Feature Card: MAGIC ERASER / OBJECT REMOVAL
             StudioFeatureCard(
-                title = "✂️ AI Hapus & Ganti Latar Belakang",
-                description = "Segmentasi neural on-device: hapus background menjadi PNG transparan, warna studio, bokeh blur, atau foto kustom.",
+                title = "✨ Magic Eraser (Hapus Objek Pengganggu)",
+                description = "Usap kabel listrik, orang lewat, jerawat, atau objek yang tidak diinginkan lalu AI menambalnya secara mulus.",
+                icon = Icons.Default.Brush,
+                accentColor = Color(0xFFFF1744),
+                onClick = {
+                    pendingTab = EditorTab.MAGIC_ERASER
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 3. Feature Card: AI DEPTH BOKEH & 3D RELIGHTING
+            StudioFeatureCard(
+                title = "📸 AI Depth Bokeh & 3D Relighting",
+                description = "Bokeh optik lensa DSLR f/1.4 tajam pada subjek + geser tata cahaya studio 3D Cyberpunk / Golden Hour.",
+                icon = Icons.Default.BlurOn,
+                accentColor = Color(0xFF00E5FF),
+                onClick = {
+                    pendingTab = EditorTab.DEPTH_BOKEH_3D
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 4. Feature Card: 1-TAP AI CUTOUT & STUDIO PRODUCT SHADOW
+            StudioFeatureCard(
+                title = "✂️ AI Cutout, Drop Shadow & Teks Belakang Orang",
+                description = "Pisahkan subjek, buat bayangan produk 3D realistis, outline stiker putih, atau selipkan teks keren di belakang orang.",
                 icon = Icons.Default.ContentCut,
                 accentColor = Color(0xFFD81B60),
                 onClick = {
@@ -250,10 +284,66 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 3. Feature Card: TEXT & TYPOGRAPHY STYLER
+            // 5. Feature Card: COLORIZE OLD B&W PHOTOS
+            StudioFeatureCard(
+                title = "🎨 Warnai Foto Hitam-Putih Jadul (Colorize)",
+                description = "Ubah foto kakek/nenek dan foto sejarah hitam-putih menjadi berwarna alami dengan model warna AI realistis.",
+                icon = Icons.Default.ColorLens,
+                accentColor = Color(0xFFFF9100),
+                onClick = {
+                    pendingTab = EditorTab.COLORIZE
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 6. Feature Card: AI ANIME & GHIBLI STYLE
+            StudioFeatureCard(
+                title = "🌸 AI Anime / Ghibli Style Transfer",
+                description = "Ubah foto portrait atau pemandangan menjadi gaya lukisan anime Jepang Makoto Shinkai & Studio Ghibli.",
+                icon = Icons.Default.Face,
+                accentColor = Color(0xFFE040FB),
+                onClick = {
+                    pendingTab = EditorTab.ANIME_STYLE
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 7. Feature Card: AI PASSPORT / ID PHOTO MAKER & 4R SHEET
+            StudioFeatureCard(
+                title = "🪪 Pasfoto Resmi & Lembar Cetak 4R",
+                description = "Potong rasio pasfoto resmi (2x3, 3x4, 4x6), ganti background Merah/Biru, dan susun ke lembar cetak 4R siap print.",
+                icon = Icons.Default.Badge,
+                accentColor = Color(0xFF00C853),
+                onClick = {
+                    pendingTab = EditorTab.PASSPORT_PHOTO
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 8. Feature Card: VINTAGE CCD & RED HALATION
+            StudioFeatureCard(
+                title = "📸 Vintage Digicam CCD & Red Halation",
+                description = "Tren kamera saku 2000-an: pendaran merah lembut pada lampu malam, analog grain, dan cap tanggal LCD '98 10 14.",
+                icon = Icons.Default.CameraAlt,
+                accentColor = Color(0xFFFF6D00),
+                onClick = {
+                    pendingTab = EditorTab.VINTAGE_CCD
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 9. Feature Card: TEXT & TYPOGRAPHY STYLER
             StudioFeatureCard(
                 title = "✍️ Studio Teks & Tipografi",
-                description = "Tambahkan teks dengan beragam font premium, efek Cyberpunk Neon, 3D Shadow, Outline, dan Badge box.",
+                description = "Tambahkan teks dengan font premium, efek Cyberpunk Neon, 3D Shadow, Outline, dan Instagram Badge box.",
                 icon = Icons.Default.TextFields,
                 accentColor = Color(0xFF1E88E5),
                 onClick = {
@@ -264,7 +354,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 4. Feature Card: PRO COLOR GRADING & FILTERS
+            // 10. Feature Card: PRO COLOR GRADING & FILTERS
             StudioFeatureCard(
                 title = "🎨 Pro Color Studio & Filter",
                 description = "Pengaturan presisi Exposure, Contrast, Saturation, Temperature, dan Vignette secara real-time.",
@@ -278,7 +368,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 5. Feature Card: CROP & TRANSFORM
+            // 11. Feature Card: CROP & TRANSFORM
             StudioFeatureCard(
                 title = "📐 Crop & Transform Studio",
                 description = "Potong foto ke rasio 1:1, 4:5, 16:9, rotasi presisi 90 derajat, dan flip horizontal/vertikal.",
@@ -292,7 +382,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 6. Feature Card: COLLAGE STUDIO GRID
+            // 12. Feature Card: COLLAGE STUDIO GRID
             StudioFeatureCard(
                 title = "🖼️ Collage Studio Grid",
                 description = "Gabungkan 2 hingga 4 foto menjadi kolase artistik dengan template grid dan margin dinamis.",

@@ -241,6 +241,648 @@ void cosineTileBlend(const uint32_t* tile, int tileW, int tileH, int dstX, int d
 }
 
 // ---------------------------------------------------------------------------
+// 7 Viral AI Engine Algorithms: Implementation
+// ---------------------------------------------------------------------------
+
+void teleaInpaint(const uint32_t* src, const int32_t* mask, uint32_t* dst, int width, int height, int radius) {
+    if (!src || !mask || !dst || width <= 0 || height <= 0) return;
+
+    int totalPixels = width * height;
+    std::memcpy(dst, src, totalPixels * sizeof(uint32_t));
+
+    // Flags: 0 = KNOWN, 1 = UNKNOWN, 2 = BAND
+    std::vector<uint8_t> flags(totalPixels, 0);
+    int unknownCount = 0;
+    for (int i = 0; i < totalPixels; ++i) {
+        if ((mask[i] & 0xFF) > 64 || ((mask[i] >> 24) & 0xFF) > 64) {
+            flags[i] = 1;
+            unknownCount++;
+        }
+    }
+    if (unknownCount == 0) return;
+
+    // Find initial band pixels (unknown adjacent to known)
+    std::vector<int> band;
+    const int dx4[4] = {1, -1, 0, 0};
+    const int dy4[4] = {0, 0, 1, -1};
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int idx = y * width + x;
+            if (flags[idx] == 1) {
+                bool hasKnownNeighbor = false;
+                for (int k = 0; k < 4; ++k) {
+                    int nx = x + dx4[k];
+                    int ny = y + dy4[k];
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        if (flags[ny * width + nx] == 0) {
+                            hasKnownNeighbor = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasKnownNeighbor) {
+                    flags[idx] = 2; // BAND
+                    band.push_back(idx);
+                }
+            }
+        }
+    }
+
+    int r = std::clamp(radius, 2, 12);
+    int rSq = r * r;
+
+    // Propagate boundary inwards
+    while (!band.empty()) {
+        std::vector<int> nextBand;
+        for (int pIdx : band) {
+            int px = pIdx % width;
+            int py = pIdx / width;
+
+            float sumWeights = 0.0f;
+            float sumR = 0.0f, sumG = 0.0f, sumB = 0.0f;
+
+            for (int dy = -r; dy <= r; ++dy) {
+                int qy = py + dy;
+                if (qy < 0 || qy >= height) continue;
+                for (int dx = -r; dx <= r; ++dx) {
+                    int qx = px + dx;
+                    if (qx < 0 || qx >= width) continue;
+
+                    int dSq = dx * dx + dy * dy;
+                    if (dSq > rSq) continue;
+
+                    int qIdx = qy * width + qx;
+                    if (flags[qIdx] == 0) { // Known neighbor
+                        float dist = std::sqrt(static_cast<float>(dSq));
+                        float w = 1.0f / (dist * dist + 0.1f);
+
+                        uint32_t col = dst[qIdx];
+                        sumR += ((col >> 16) & 0xFF) * w;
+                        sumG += ((col >> 8) & 0xFF) * w;
+                        sumB += (col & 0xFF) * w;
+                        sumWeights += w;
+                    }
+                }
+            }
+
+            if (sumWeights > 0.00001f) {
+                uint32_t a = (src[pIdx] >> 24) & 0xFF;
+                dst[pIdx] = (a << 24) |
+                            (clamp8(sumR / sumWeights) << 16) |
+                            (clamp8(sumG / sumWeights) << 8) |
+                            clamp8(sumB / sumWeights);
+            }
+            flags[pIdx] = 0; // Marked as known now
+
+            // Check neighbors for new band pixels
+            for (int k = 0; k < 4; ++k) {
+                int nx = px + dx4[k];
+                int ny = py + dy4[k];
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    int nIdx = ny * width + nx;
+                    if (flags[nIdx] == 1) { // Unknown neighbor becomes band
+                        flags[nIdx] = 2;
+                        nextBand.push_back(nIdx);
+                    }
+                }
+            }
+        }
+        band = std::move(nextBand);
+    }
+
+    // Edge-preserving smoothing pass over inpainted pixels
+    std::vector<uint32_t> temp(totalPixels);
+    std::memcpy(temp.data(), dst, totalPixels * sizeof(uint32_t));
+
+    for (int y = 1; y < height - 1; ++y) {
+        for (int x = 1; x < width - 1; ++x) {
+            int idx = y * width + x;
+            if ((mask[idx] & 0xFF) > 64 || ((mask[idx] >> 24) & 0xFF) > 64) {
+                float rAcc = 0.0f, gAcc = 0.0f, bAcc = 0.0f, wAcc = 0.0f;
+                uint32_t centerP = temp[idx];
+                float cR = (centerP >> 16) & 0xFF;
+                float cG = (centerP >> 8) & 0xFF;
+                float cB = centerP & 0xFF;
+
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        uint32_t neighbor = temp[(y + dy) * width + (x + dx)];
+                        float nR = (neighbor >> 16) & 0xFF;
+                        float nG = (neighbor >> 8) & 0xFF;
+                        float nB = neighbor & 0xFF;
+
+                        float colorDiff = std::abs(cR - nR) + std::abs(cG - nG) + std::abs(cB - nB);
+                        float w = (dx == 0 && dy == 0) ? 2.0f : 1.0f / (1.0f + colorDiff * 0.05f);
+
+                        rAcc += nR * w;
+                        gAcc += nG * w;
+                        bAcc += nB * w;
+                        wAcc += w;
+                    }
+                }
+                uint32_t a = (dst[idx] >> 24) & 0xFF;
+                dst[idx] = (a << 24) |
+                           (clamp8(rAcc / wAcc) << 16) |
+                           (clamp8(gAcc / wAcc) << 8) |
+                           clamp8(bAcc / wAcc);
+            }
+        }
+    }
+}
+
+void depthBokeh(const uint32_t* src, const float* depthMask, uint32_t* dst, int width, int height, float maxBlurRadius, float focusDepth) {
+    if (!src || !depthMask || !dst || width <= 0 || height <= 0) return;
+
+    float maxR = std::clamp(maxBlurRadius, 1.0f, 32.0f);
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int idx = y * width + x;
+            float d = depthMask[idx];
+            float coc = std::clamp(std::abs(d - focusDepth) * maxR, 0.0f, maxR);
+
+            if (coc < 0.6f) {
+                dst[idx] = src[idx];
+                continue;
+            }
+
+            int ir = static_cast<int>(std::ceil(coc));
+            int irSq = ir * ir;
+            float rSum = 0.0f, gSum = 0.0f, bSum = 0.0f, wSum = 0.0f;
+
+            int step = (ir > 12) ? 2 : 1;
+            for (int dy = -ir; dy <= ir; dy += step) {
+                int ny = std::clamp(y + dy, 0, height - 1);
+                for (int dx = -ir; dx <= ir; dx += step) {
+                    int nx = std::clamp(x + dx, 0, width - 1);
+                    int distSq = dx * dx + dy * dy;
+                    if (distSq > irSq) continue;
+
+                    uint32_t p = src[ny * width + nx];
+                    float pr = (p >> 16) & 0xFF;
+                    float pg = (p >> 8) & 0xFF;
+                    float pb = p & 0xFF;
+
+                    float lum = 0.299f * pr + 0.587f * pg + 0.114f * pb;
+                    float bloom = 1.0f;
+                    if (lum > 175.0f) {
+                        float diff = (lum - 175.0f) / 80.0f;
+                        bloom += 3.5f * diff * diff;
+                    }
+
+                    rSum += pr * bloom;
+                    gSum += pg * bloom;
+                    bSum += pb * bloom;
+                    wSum += bloom;
+                }
+            }
+
+            uint32_t a = (src[idx] >> 24) & 0xFF;
+            if (wSum > 0.0001f) {
+                dst[idx] = (a << 24) |
+                           (clamp8(rSum / wSum) << 16) |
+                           (clamp8(gSum / wSum) << 8) |
+                           clamp8(bSum / wSum);
+            } else {
+                dst[idx] = src[idx];
+            }
+        }
+    }
+}
+
+void relighting3D(const uint32_t* src, const float* depthMask, uint32_t* dst, int width, int height,
+                  float lightX, float lightY, float lightZ,
+                  float lightR, float lightG, float lightB, float intensity) {
+    if (!src || !depthMask || !dst || width <= 0 || height <= 0) return;
+
+    float lZ = std::max(0.1f, lightZ);
+
+    for (int y = 0; y < height; ++y) {
+        float v = static_cast<float>(y) / height;
+        for (int x = 0; x < width; ++x) {
+            float u = static_cast<float>(x) / width;
+            int idx = y * width + x;
+
+            int xL = std::max(0, x - 1);
+            int xR = std::min(width - 1, x + 1);
+            int yU = std::max(0, y - 1);
+            int yD = std::min(height - 1, y + 1);
+
+            float dL = depthMask[y * width + xL];
+            float dR = depthMask[y * width + xR];
+            float dU = depthMask[yU * width + x];
+            float dD = depthMask[yD * width + x];
+
+            float gx = (dR - dL) * 3.5f;
+            float gy = (dD - dU) * 3.5f;
+            float nLen = std::sqrt(gx * gx + gy * gy + 1.0f);
+            float nx = -gx / nLen;
+            float ny = -gy / nLen;
+            float nz = 1.0f / nLen;
+
+            float lx = lightX - u;
+            float ly = lightY - v;
+            float lz = lZ;
+            float lDist = std::sqrt(lx * lx + ly * ly + lz * lz);
+            if (lDist > 0.0001f) {
+                lx /= lDist;
+                ly /= lDist;
+                lz /= lDist;
+            }
+
+            float diff = std::max(0.0f, nx * lx + ny * ly + nz * lz);
+
+            float hx = lx;
+            float hy = ly;
+            float hz = lz + 1.0f;
+            float hLen = std::sqrt(hx * hx + hy * hy + hz * hz);
+            float spec = 0.0f;
+            if (hLen > 0.0001f) {
+                hx /= hLen;
+                hy /= hLen;
+                hz /= hLen;
+                float nDotH = std::max(0.0f, nx * hx + ny * hy + nz * hz);
+                spec = std::pow(nDotH, 16.0f) * 0.45f;
+            }
+
+            float atten = 1.0f / (1.0f + 1.8f * lDist * lDist);
+            float personWeight = depthMask[idx];
+            float factor = (diff * 0.8f + spec) * atten * intensity * personWeight;
+
+            uint32_t orig = src[idx];
+            uint32_t a = (orig >> 24) & 0xFF;
+            float oR = (orig >> 16) & 0xFF;
+            float oG = (orig >> 8) & 0xFF;
+            float oB = orig & 0xFF;
+
+            float newR = oR + (lightR * factor * 255.0f);
+            float newG = oG + (lightG * factor * 255.0f);
+            float newB = oB + (lightB * factor * 255.0f);
+
+            dst[idx] = (a << 24) | (clamp8(newR) << 16) | (clamp8(newG) << 8) | clamp8(newB);
+        }
+    }
+}
+
+void vintageHalation(const uint32_t* src, uint32_t* dst, int width, int height,
+                     float halationRadius, float grainStrength, float chromaticShift, float warmth) {
+    if (!src || !dst || width <= 0 || height <= 0) return;
+
+    int total = width * height;
+    std::vector<float> halation(total, 0.0f);
+
+    for (int i = 0; i < total; ++i) {
+        uint32_t p = src[i];
+        float r = (p >> 16) & 0xFF;
+        float g = (p >> 8) & 0xFF;
+        float b = p & 0xFF;
+        float lum = 0.299f * r + 0.587f * g + 0.114f * b;
+        if (lum > 200.0f) {
+            halation[i] = ((lum - 200.0f) / 55.0f) * 255.0f;
+        }
+    }
+
+    int hr = std::clamp(static_cast<int>(halationRadius), 2, 24);
+    std::vector<float> hKernel(2 * hr + 1);
+    float hSigma = hr * 0.5f;
+    float hSum = 0.0f;
+    for (int i = -hr; i <= hr; ++i) {
+        float val = std::exp(-(i * i) / (2.0f * hSigma * hSigma));
+        hKernel[i + hr] = val;
+        hSum += val;
+    }
+    for (size_t i = 0; i < hKernel.size(); ++i) hKernel[i] /= hSum;
+
+    std::vector<float> tempH(total, 0.0f);
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            float acc = 0.0f;
+            for (int k = -hr; k <= hr; ++k) {
+                int nx = std::clamp(x + k, 0, width - 1);
+                acc += halation[y * width + nx] * hKernel[k + hr];
+            }
+            tempH[y * width + x] = acc;
+        }
+    }
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            float acc = 0.0f;
+            for (int k = -hr; k <= hr; ++k) {
+                int ny = std::clamp(y + k, 0, height - 1);
+                acc += tempH[ny * width + x] * hKernel[k + hr];
+            }
+            halation[y * width + x] = acc;
+        }
+    }
+
+    float cx = width * 0.5f;
+    float cy = height * 0.5f;
+    float maxDist = std::sqrt(cx * cx + cy * cy);
+    float chromScale = chromaticShift * 0.008f;
+
+    for (int y = 0; y < height; ++y) {
+        float dy = y - cy;
+        for (int x = 0; x < width; ++x) {
+            float dx = x - cx;
+            int idx = y * width + x;
+
+            float distNorm = std::sqrt(dx * dx + dy * dy) / maxDist;
+            float shift = chromScale * distNorm;
+
+            int rx = std::clamp(static_cast<int>(cx + dx * (1.0f + shift) + 0.5f), 0, width - 1);
+            int ry = std::clamp(static_cast<int>(cy + dy * (1.0f + shift) + 0.5f), 0, height - 1);
+            int bx = std::clamp(static_cast<int>(cx + dx * (1.0f - shift) + 0.5f), 0, width - 1);
+            int by = std::clamp(static_cast<int>(cy + dy * (1.0f - shift) + 0.5f), 0, height - 1);
+
+            uint32_t rPixel = src[ry * width + rx];
+            uint32_t gPixel = src[idx];
+            uint32_t bPixel = src[by * width + bx];
+
+            float r = (rPixel >> 16) & 0xFF;
+            float g = (gPixel >> 8) & 0xFF;
+            float b = bPixel & 0xFF;
+            uint32_t a = (gPixel >> 24) & 0xFF;
+
+            float hVal = halation[idx] * warmth;
+            r += hVal * 1.0f;
+            g += hVal * 0.22f;
+            b += hVal * 0.04f;
+
+            float lum = 0.299f * r + 0.587f * g + 0.114f * b;
+            float midtoneCurve = 4.0f * (lum / 255.0f) * (1.0f - (lum / 255.0f));
+
+            uint32_t h = (static_cast<uint32_t>(x) * 1664525u + static_cast<uint32_t>(y) * 1013904223u) ^ 0x4f35b719u;
+            h ^= h >> 13;
+            h *= 0x5bd1e995u;
+            h ^= h >> 15;
+            float noise = ((h & 0xFFFF) / 32767.5f) - 1.0f;
+
+            float grain = noise * midtoneCurve * grainStrength * 24.0f;
+            r += grain;
+            g += grain;
+            b += grain;
+
+            r = r * 1.02f + 4.0f;
+            g = g * 1.01f + 2.0f;
+            b = b * 0.98f;
+
+            dst[idx] = (a << 24) | (clamp8(r) << 16) | (clamp8(g) << 8) | clamp8(b);
+        }
+    }
+}
+
+void animeCelShade(const uint32_t* src, uint32_t* dst, int width, int height,
+                   int radius, float edgeStrength, float vibrancy) {
+    if (!src || !dst || width <= 0 || height <= 0) return;
+
+    int r = std::clamp(radius, 2, 7);
+    int total = width * height;
+    std::vector<float> lum(total);
+
+    for (int i = 0; i < total; ++i) {
+        uint32_t p = src[i];
+        lum[i] = 0.299f * ((p >> 16) & 0xFF) + 0.587f * ((p >> 8) & 0xFF) + 0.114f * (p & 0xFF);
+    }
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int idx = y * width + x;
+
+            float bestVar = 1e9f;
+            float bestR = 0.0f, bestG = 0.0f, bestB = 0.0f;
+
+            const int qx0[4] = {0, -r, -r, 0};
+            const int qx1[4] = {r, 0, 0, r};
+            const int qy0[4] = {0, 0, -r, -r};
+            const int qy1[4] = {r, r, 0, 0};
+
+            for (int q = 0; q < 4; ++q) {
+                float sumR = 0.0f, sumG = 0.0f, sumB = 0.0f;
+                float sumSqR = 0.0f, sumSqG = 0.0f, sumSqB = 0.0f;
+                int count = 0;
+
+                for (int dy = qy0[q]; dy <= qy1[q]; ++dy) {
+                    int ny = std::clamp(y + dy, 0, height - 1);
+                    for (int dx = qx0[q]; dx <= qx1[q]; ++dx) {
+                        int nx = std::clamp(x + dx, 0, width - 1);
+                        uint32_t p = src[ny * width + nx];
+                        float pr = (p >> 16) & 0xFF;
+                        float pg = (p >> 8) & 0xFF;
+                        float pb = p & 0xFF;
+
+                        sumR += pr; sumG += pg; sumB += pb;
+                        sumSqR += pr * pr; sumSqG += pg * pg; sumSqB += pb * pb;
+                        count++;
+                    }
+                }
+
+                if (count > 0) {
+                    float meanR = sumR / count;
+                    float meanG = sumG / count;
+                    float meanB = sumB / count;
+                    float var = (sumSqR / count - meanR * meanR) +
+                                (sumSqG / count - meanG * meanG) +
+                                (sumSqB / count - meanB * meanB);
+
+                    if (var < bestVar) {
+                        bestVar = var;
+                        bestR = meanR;
+                        bestG = meanG;
+                        bestB = meanB;
+                    }
+                }
+            }
+
+            int x0 = std::max(0, x - 1);
+            int x1 = std::min(width - 1, x + 1);
+            int y0 = std::max(0, y - 1);
+            int y1 = std::min(height - 1, y + 1);
+
+            float gx = (lum[y0 * width + x1] + 2.0f * lum[y * width + x1] + lum[y1 * width + x1]) -
+                       (lum[y0 * width + x0] + 2.0f * lum[y * width + x0] + lum[y1 * width + x0]);
+            float gy = (lum[y1 * width + x0] + 2.0f * lum[y1 * width + x] + lum[y1 * width + x1]) -
+                       (lum[y0 * width + x0] + 2.0f * lum[y0 * width + x] + lum[y0 * width + x1]);
+            float edgeMag = std::sqrt(gx * gx + gy * gy);
+
+            float inkFactor = 1.0f;
+            if (edgeMag > 36.0f) {
+                float edgeNorm = std::min(1.0f, (edgeMag - 36.0f) / 60.0f);
+                inkFactor = 1.0f - (edgeStrength * edgeNorm * 0.75f);
+            }
+
+            bestR *= inkFactor;
+            bestG *= inkFactor;
+            bestB *= inkFactor;
+
+            float avg = (bestR + bestG + bestB) / 3.0f;
+            bestR = avg + (bestR - avg) * (1.0f + vibrancy * 0.4f);
+            bestG = avg + (bestG - avg) * (1.0f + vibrancy * 0.45f);
+            bestB = avg + (bestB - avg) * (1.0f + vibrancy * 0.35f);
+
+            uint32_t a = (src[idx] >> 24) & 0xFF;
+            dst[idx] = (a << 24) | (clamp8(bestR) << 16) | (clamp8(bestG) << 8) | clamp8(bestB);
+        }
+    }
+}
+
+void colorizeGrayscale(const uint32_t* src, const float* personMask, uint32_t* dst, int width, int height,
+                       float skinWarmth, float skyCyan) {
+    if (!src || !personMask || !dst || width <= 0 || height <= 0) return;
+
+    int total = width * height;
+
+    for (int idx = 0; idx < total; ++idx) {
+        uint32_t p = src[idx];
+        uint32_t a = (p >> 24) & 0xFF;
+        float rOrig = (p >> 16) & 0xFF;
+        float gOrig = (p >> 8) & 0xFF;
+        float bOrig = p & 0xFF;
+
+        float Y = 0.299f * rOrig + 0.587f * gOrig + 0.114f * bOrig;
+        float isPerson = personMask[idx];
+
+        float rFinal = Y, gFinal = Y, bFinal = Y;
+
+        if (isPerson > 0.3f) {
+            if (Y < 55.0f) {
+                rFinal = Y * 1.05f + 3.0f;
+                gFinal = Y * 0.98f + 1.0f;
+                bFinal = Y * 0.95f;
+            } else if (Y <= 215.0f) {
+                float skinW = skinWarmth * isPerson;
+                rFinal = Y + 38.0f * skinW;
+                gFinal = Y + 12.0f * skinW;
+                bFinal = Y - 16.0f * skinW;
+            } else {
+                rFinal = Y + 10.0f;
+                gFinal = Y + 6.0f;
+                bFinal = Y;
+            }
+        } else {
+            if (Y > 155.0f) {
+                float sky = skyCyan * (1.0f - isPerson);
+                rFinal = Y - 16.0f * sky;
+                gFinal = Y + 4.0f * sky;
+                bFinal = Y + 32.0f * sky;
+            } else if (Y >= 65.0f) {
+                rFinal = Y + 2.0f;
+                gFinal = Y + 18.0f;
+                bFinal = Y - 8.0f;
+            } else {
+                rFinal = Y + 4.0f;
+                gFinal = Y + 1.0f;
+                bFinal = Y;
+            }
+        }
+
+        dst[idx] = (a << 24) | (clamp8(rFinal) << 16) | (clamp8(gFinal) << 8) | clamp8(bFinal);
+    }
+}
+
+void studioShadowOutline(const uint32_t* src, const float* mask, uint32_t* dst, int width, int height,
+                         int shadowDx, int shadowDy, int shadowRadius, float shadowAlpha,
+                         int outlineWidth, uint32_t outlineColor) {
+    if (!src || !mask || !dst || width <= 0 || height <= 0) return;
+
+    int total = width * height;
+    std::vector<float> dilatedMask(total, 0.0f);
+    int oWidth = std::clamp(outlineWidth, 0, 30);
+
+    if (oWidth > 0) {
+        int oSq = oWidth * oWidth;
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                if (mask[y * width + x] > 0.45f) {
+                    for (int dy = -oWidth; dy <= oWidth; ++dy) {
+                        int ny = y + dy;
+                        if (ny < 0 || ny >= height) continue;
+                        for (int dx = -oWidth; dx <= oWidth; ++dx) {
+                            int nx = x + dx;
+                            if (nx < 0 || nx >= width) continue;
+                            if (dx * dx + dy * dy <= oSq) {
+                                dilatedMask[ny * width + nx] = 1.0f;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        std::copy(mask, mask + total, dilatedMask.begin());
+    }
+
+    std::vector<float> shadowMap(total, 0.0f);
+    int sr = std::clamp(shadowRadius, 1, 30);
+    for (int y = 0; y < height; ++y) {
+        int srcY = y - shadowDy;
+        for (int x = 0; x < width; ++x) {
+            int srcX = x - shadowDx;
+            if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+                shadowMap[y * width + x] = dilatedMask[srcY * width + srcX];
+            }
+        }
+    }
+
+    std::vector<float> tempS(total, 0.0f);
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            float sum = 0.0f;
+            int count = 0;
+            for (int k = -sr; k <= sr; ++k) {
+                int nx = std::clamp(x + k, 0, width - 1);
+                sum += shadowMap[y * width + nx];
+                count++;
+            }
+            tempS[y * width + x] = sum / count;
+        }
+    }
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            float sum = 0.0f;
+            int count = 0;
+            for (int k = -sr; k <= sr; ++k) {
+                int ny = std::clamp(y + k, 0, height - 1);
+                sum += tempS[ny * width + x];
+                count++;
+            }
+            shadowMap[y * width + x] = sum / count;
+        }
+    }
+
+    uint8_t outA = (outlineColor >> 24) & 0xFF;
+    uint8_t outR = (outlineColor >> 16) & 0xFF;
+    uint8_t outG = (outlineColor >> 8) & 0xFF;
+    uint8_t outB = outlineColor & 0xFF;
+
+    for (int i = 0; i < total; ++i) {
+        uint32_t origP = src[i];
+        float origA = ((origP >> 24) & 0xFF);
+        float origR = ((origP >> 16) & 0xFF);
+        float origG = ((origP >> 8) & 0xFF);
+        float origB = (origP & 0xFF);
+
+        float fg = mask[i];
+        float outline = dilatedMask[i];
+        float shadow = shadowMap[i] * shadowAlpha;
+
+        if (fg > 0.6f) {
+            dst[i] = origP;
+        } else if (outline > 0.5f && oWidth > 0) {
+            dst[i] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+        } else if (shadow > 0.01f) {
+            float sDarken = 1.0f - std::clamp(shadow, 0.0f, 0.85f);
+            dst[i] = (static_cast<uint32_t>(origA) << 24) |
+                     (clamp8(origR * sDarken) << 16) |
+                     (clamp8(origG * sDarken) << 8) |
+                     clamp8(origB * sDarken);
+        } else {
+            dst[i] = origP;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // JNI Implementation
 // ---------------------------------------------------------------------------
 
@@ -583,6 +1225,191 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileNative(
         if (target) env->ReleaseIntArrayElements(targetPixels, target, JNI_ABORT);
         return JNI_FALSE;
     }
+}
+
+// ---------------------------------------------------------------------------
+// 7 Viral AI Engine: JNI Bridge Functions
+// ---------------------------------------------------------------------------
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_inpaintNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jintArray inMask, jint width, jint height, jint radius
+) {
+    if (!inPixels || !inMask || width <= 0 || height <= 0) return nullptr;
+    jint* src = env->GetIntArrayElements(inPixels, nullptr);
+    jint* mask = env->GetIntArrayElements(inMask, nullptr);
+    if (!src || !mask) {
+        if (src) env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+        if (mask) env->ReleaseIntArrayElements(inMask, mask, JNI_ABORT);
+        return nullptr;
+    }
+
+    int total = width * height;
+    std::vector<uint32_t> dst(total);
+    teleaInpaint(reinterpret_cast<const uint32_t*>(src), mask, dst.data(), width, height, radius);
+
+    env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+    env->ReleaseIntArrayElements(inMask, mask, JNI_ABORT);
+
+    jintArray result = env->NewIntArray(total);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, total, reinterpret_cast<const jint*>(dst.data()));
+    }
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_depthBokehNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray depthMask, jint width, jint height, jfloat blurRadius, jfloat focusDepth
+) {
+    if (!inPixels || !depthMask || width <= 0 || height <= 0) return nullptr;
+    jint* src = env->GetIntArrayElements(inPixels, nullptr);
+    jfloat* mask = env->GetFloatArrayElements(depthMask, nullptr);
+    if (!src || !mask) {
+        if (src) env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+        if (mask) env->ReleaseFloatArrayElements(depthMask, mask, JNI_ABORT);
+        return nullptr;
+    }
+
+    int total = width * height;
+    std::vector<uint32_t> dst(total);
+    depthBokeh(reinterpret_cast<const uint32_t*>(src), mask, dst.data(), width, height, blurRadius, focusDepth);
+
+    env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+    env->ReleaseFloatArrayElements(depthMask, mask, JNI_ABORT);
+
+    jintArray result = env->NewIntArray(total);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, total, reinterpret_cast<const jint*>(dst.data()));
+    }
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_relighting3DNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray depthMask, jint width, jint height,
+    jfloat lightX, jfloat lightY, jfloat lightZ, jfloat lightR, jfloat lightG, jfloat lightB, jfloat intensity
+) {
+    if (!inPixels || !depthMask || width <= 0 || height <= 0) return nullptr;
+    jint* src = env->GetIntArrayElements(inPixels, nullptr);
+    jfloat* mask = env->GetFloatArrayElements(depthMask, nullptr);
+    if (!src || !mask) {
+        if (src) env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+        if (mask) env->ReleaseFloatArrayElements(depthMask, mask, JNI_ABORT);
+        return nullptr;
+    }
+
+    int total = width * height;
+    std::vector<uint32_t> dst(total);
+    relighting3D(reinterpret_cast<const uint32_t*>(src), mask, dst.data(), width, height,
+                 lightX, lightY, lightZ, lightR, lightG, lightB, intensity);
+
+    env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+    env->ReleaseFloatArrayElements(depthMask, mask, JNI_ABORT);
+
+    jintArray result = env->NewIntArray(total);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, total, reinterpret_cast<const jint*>(dst.data()));
+    }
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_animeCelShadeNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jint width, jint height, jint radius, jfloat edgeStrength, jfloat vibrancy
+) {
+    if (!inPixels || width <= 0 || height <= 0) return nullptr;
+    jint* src = env->GetIntArrayElements(inPixels, nullptr);
+    if (!src) return nullptr;
+
+    int total = width * height;
+    std::vector<uint32_t> dst(total);
+    animeCelShade(reinterpret_cast<const uint32_t*>(src), dst.data(), width, height, radius, edgeStrength, vibrancy);
+
+    env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+
+    jintArray result = env->NewIntArray(total);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, total, reinterpret_cast<const jint*>(dst.data()));
+    }
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_vintageHalationNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jint width, jint height, jfloat halationRadius, jfloat grainStrength, jfloat chromaticShift, jfloat warmth
+) {
+    if (!inPixels || width <= 0 || height <= 0) return nullptr;
+    jint* src = env->GetIntArrayElements(inPixels, nullptr);
+    if (!src) return nullptr;
+
+    int total = width * height;
+    std::vector<uint32_t> dst(total);
+    vintageHalation(reinterpret_cast<const uint32_t*>(src), dst.data(), width, height, halationRadius, grainStrength, chromaticShift, warmth);
+
+    env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+
+    jintArray result = env->NewIntArray(total);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, total, reinterpret_cast<const jint*>(dst.data()));
+    }
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_colorizeGrayscaleNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray personMask, jint width, jint height, jfloat skinWarmth, jfloat skyCyan
+) {
+    if (!inPixels || !personMask || width <= 0 || height <= 0) return nullptr;
+    jint* src = env->GetIntArrayElements(inPixels, nullptr);
+    jfloat* mask = env->GetFloatArrayElements(personMask, nullptr);
+    if (!src || !mask) {
+        if (src) env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+        if (mask) env->ReleaseFloatArrayElements(personMask, mask, JNI_ABORT);
+        return nullptr;
+    }
+
+    int total = width * height;
+    std::vector<uint32_t> dst(total);
+    colorizeGrayscale(reinterpret_cast<const uint32_t*>(src), mask, dst.data(), width, height, skinWarmth, skyCyan);
+
+    env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+    env->ReleaseFloatArrayElements(personMask, mask, JNI_ABORT);
+
+    jintArray result = env->NewIntArray(total);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, total, reinterpret_cast<const jint*>(dst.data()));
+    }
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_studioShadowOutlineNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray mask, jint width, jint height,
+    jint shadowDx, jint shadowDy, jint shadowRadius, jfloat shadowAlpha, jint outlineWidth, jint outlineColor
+) {
+    if (!inPixels || !mask || width <= 0 || height <= 0) return nullptr;
+    jint* src = env->GetIntArrayElements(inPixels, nullptr);
+    jfloat* m = env->GetFloatArrayElements(mask, nullptr);
+    if (!src || !m) {
+        if (src) env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+        if (m) env->ReleaseFloatArrayElements(mask, m, JNI_ABORT);
+        return nullptr;
+    }
+
+    int total = width * height;
+    std::vector<uint32_t> dst(total);
+    studioShadowOutline(reinterpret_cast<const uint32_t*>(src), m, dst.data(), width, height,
+                        shadowDx, shadowDy, shadowRadius, shadowAlpha, outlineWidth, static_cast<uint32_t>(outlineColor));
+
+    env->ReleaseIntArrayElements(inPixels, src, JNI_ABORT);
+    env->ReleaseFloatArrayElements(mask, m, JNI_ABORT);
+
+    jintArray result = env->NewIntArray(total);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, total, reinterpret_cast<const jint*>(dst.data()));
+    }
+    return result;
 }
 
 // ---------------------------------------------------------------------------

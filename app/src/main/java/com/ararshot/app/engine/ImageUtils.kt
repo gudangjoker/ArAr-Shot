@@ -206,4 +206,46 @@ object ImageUtils {
             false
         }
     }
+
+    /**
+     * Stamps an authentic vintage digicam 90s/2000s LCD orange date stamp ('98 10 14)
+     * in the lower-right corner with realistic phosphor glow.
+     */
+    fun addRetroDateStamp(
+        source: Bitmap,
+        dateText: String = "'98 10 14",
+        color: Int = android.graphics.Color.parseColor("#FF8C00")
+    ): Bitmap {
+        val result = source.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(result)
+        val width = result.width.toFloat()
+        val height = result.height.toFloat()
+
+        val fontSize = (width * 0.042f).coerceIn(24f, 84f)
+        val marginX = width * 0.05f
+        val marginY = height * 0.05f
+
+        val paintGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            textSize = fontSize
+            typeface = android.graphics.Typeface.MONOSPACE
+            textAlign = Paint.Align.RIGHT
+            setShadowLayer(fontSize * 0.35f, 0f, 0f, color)
+        }
+
+        val paintText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = android.graphics.Color.WHITE
+            textSize = fontSize
+            typeface = android.graphics.Typeface.MONOSPACE
+            textAlign = Paint.Align.RIGHT
+        }
+
+        val x = width - marginX
+        val y = height - marginY
+
+        canvas.drawText(dateText, x, y, paintGlow)
+        canvas.drawText(dateText, x, y, paintText)
+
+        return result
+    }
 }

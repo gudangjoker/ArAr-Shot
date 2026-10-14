@@ -39,6 +39,21 @@ void superResolutionFallback(const uint32_t* src, uint32_t* dst, int srcW, int s
 void cosineTileBlend(const uint32_t* tile, int tileW, int tileH, int dstX, int dstY,
                      uint32_t* target, float* weightMap, int targetW, int targetH);
 
+// 7 Viral AI Engine Native Algorithms
+void teleaInpaint(const uint32_t* src, const int32_t* mask, uint32_t* dst, int width, int height, int radius);
+void depthBokeh(const uint32_t* src, const float* depthMask, uint32_t* dst, int width, int height, float maxBlurRadius, float focusDepth);
+void relighting3D(const uint32_t* src, const float* depthMask, uint32_t* dst, int width, int height,
+                  float lightX, float lightY, float lightZ,
+                  float lightR, float lightG, float lightB, float intensity);
+void animeCelShade(const uint32_t* src, uint32_t* dst, int width, int height, int radius, float edgeStrength, float vibrancy);
+void vintageHalation(const uint32_t* src, uint32_t* dst, int width, int height,
+                     float halationRadius, float grainStrength, float chromaticShift, float warmth);
+void colorizeGrayscale(const uint32_t* src, const float* personMask, uint32_t* dst, int width, int height,
+                       float skinWarmth, float skyCyan);
+void studioShadowOutline(const uint32_t* src, const float* mask, uint32_t* dst, int width, int height,
+                         int shadowDx, int shadowDy, int shadowRadius, float shadowAlpha,
+                         int outlineWidth, uint32_t outlineColor);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -89,6 +104,44 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileNative(
     jintArray targetPixels,
     jint targetW,
     jint targetH
+);
+
+// JNI signatures for 7 Viral AI Engine features (com.ararshot.app.engine.ImageEnhancerNative)
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_inpaintNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jintArray inMask, jint width, jint height, jint radius
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_depthBokehNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray depthMask, jint width, jint height, jfloat blurRadius, jfloat focusDepth
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_relighting3DNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray depthMask, jint width, jint height,
+    jfloat lightX, jfloat lightY, jfloat lightZ, jfloat lightR, jfloat lightG, jfloat lightB, jfloat intensity
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_animeCelShadeNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jint width, jint height, jint radius, jfloat edgeStrength, jfloat vibrancy
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_vintageHalationNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jint width, jint height, jfloat halationRadius, jfloat grainStrength, jfloat chromaticShift, jfloat warmth
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_colorizeGrayscaleNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray personMask, jint width, jint height, jfloat skinWarmth, jfloat skyCyan
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_studioShadowOutlineNative(
+    JNIEnv* env, jobject thiz, jintArray inPixels, jfloatArray mask, jint width, jint height,
+    jint shadowDx, jint shadowDy, jint shadowRadius, jfloat shadowAlpha, jint outlineWidth, jint outlineColor
 );
 
 // Backward-compatible signatures for com.example.engine.ImageEnhancerNative

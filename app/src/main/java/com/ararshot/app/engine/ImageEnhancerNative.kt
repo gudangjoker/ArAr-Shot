@@ -84,6 +84,79 @@ object ImageEnhancerNative {
         targetH: Int
     ): Boolean
 
+    // 7 Viral AI Engine Native Functions
+    external fun inpaintNative(
+        inPixels: IntArray,
+        inMask: IntArray,
+        width: Int,
+        height: Int,
+        radius: Int
+    ): IntArray?
+
+    external fun depthBokehNative(
+        inPixels: IntArray,
+        depthMask: FloatArray,
+        width: Int,
+        height: Int,
+        blurRadius: Float,
+        focusDepth: Float
+    ): IntArray?
+
+    external fun relighting3DNative(
+        inPixels: IntArray,
+        depthMask: FloatArray,
+        width: Int,
+        height: Int,
+        lightX: Float,
+        lightY: Float,
+        lightZ: Float,
+        lightR: Float,
+        lightG: Float,
+        lightB: Float,
+        intensity: Float
+    ): IntArray?
+
+    external fun animeCelShadeNative(
+        inPixels: IntArray,
+        width: Int,
+        height: Int,
+        radius: Int,
+        edgeStrength: Float,
+        vibrancy: Float
+    ): IntArray?
+
+    external fun vintageHalationNative(
+        inPixels: IntArray,
+        width: Int,
+        height: Int,
+        halationRadius: Float,
+        grainStrength: Float,
+        chromaticShift: Float,
+        warmth: Float
+    ): IntArray?
+
+    external fun colorizeGrayscaleNative(
+        inPixels: IntArray,
+        personMask: FloatArray,
+        width: Int,
+        height: Int,
+        skinWarmth: Float,
+        skyCyan: Float
+    ): IntArray?
+
+    external fun studioShadowOutlineNative(
+        inPixels: IntArray,
+        mask: FloatArray,
+        width: Int,
+        height: Int,
+        shadowDx: Int,
+        shadowDy: Int,
+        shadowRadius: Int,
+        shadowAlpha: Float,
+        outlineWidth: Int,
+        outlineColor: Int
+    ): IntArray?
+
     /**
      * Initializes NCNN Vulkan compute and loads Real-ESRGAN model weights from APK assets.
      */
@@ -169,5 +242,247 @@ object ImageEnhancerNative {
      */
     fun upscaleImage(input: Bitmap, strength: Float = 0.8f): Bitmap {
         return enhanceImage(input, MODE_SUPER_RESOLUTION, strength)
+    }
+
+    /**
+     * Magic Eraser: Native Fast Marching Method (Telea) Inpainting.
+     * Takes an image and a binary mask where non-zero pixels represent objects to remove.
+     */
+    fun inpaint(input: Bitmap, mask: Bitmap, radius: Int = 6): Bitmap {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+
+        val scaledMask = if (mask.width != width || mask.height != height) {
+            Bitmap.createScaledBitmap(mask, width, height, false)
+        } else {
+            mask
+        }
+
+        val inPixels = IntArray(width * height)
+        input.getPixels(inPixels, 0, width, 0, 0, width, height)
+
+        val maskPixels = IntArray(width * height)
+        scaledMask.getPixels(maskPixels, 0, width, 0, 0, width, height)
+
+        return try {
+            val resultPixels = if (isNativeLibraryLoaded) {
+                inpaintNative(inPixels, maskPixels, width, height, radius)
+            } else null
+
+            if (resultPixels != null && resultPixels.size == width * height) {
+                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
+                outBitmap
+            } else {
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "inpaint error: ${t.message}", t)
+            input
+        }
+    }
+
+    /**
+     * Optical Lens Bokeh Blur using on-device depth map.
+     */
+    fun depthBokeh(input: Bitmap, depthMask: FloatArray, blurRadius: Float = 16f, focusDepth: Float = 1.0f): Bitmap {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val inPixels = IntArray(width * height)
+        input.getPixels(inPixels, 0, width, 0, 0, width, height)
+
+        return try {
+            val resultPixels = if (isNativeLibraryLoaded && depthMask.size == width * height) {
+                depthBokehNative(inPixels, depthMask, width, height, blurRadius, focusDepth)
+            } else null
+
+            if (resultPixels != null && resultPixels.size == width * height) {
+                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
+                outBitmap
+            } else {
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "depthBokeh error: ${t.message}", t)
+            input
+        }
+    }
+
+    /**
+     * 3D Studio Relighting: simulates directional light source following 3D subject curvature.
+     */
+    fun relighting3D(
+        input: Bitmap,
+        depthMask: FloatArray,
+        lightX: Float,
+        lightY: Float,
+        lightZ: Float,
+        lightColor: Int,
+        intensity: Float
+    ): Bitmap {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val inPixels = IntArray(width * height)
+        input.getPixels(inPixels, 0, width, 0, 0, width, height)
+
+        val r = ((lightColor shr 16) and 0xFF) / 255.0f
+        val g = ((lightColor shr 8) and 0xFF) / 255.0f
+        val b = (lightColor and 0xFF) / 255.0f
+
+        return try {
+            val resultPixels = if (isNativeLibraryLoaded && depthMask.size == width * height) {
+                relighting3DNative(inPixels, depthMask, width, height, lightX, lightY, lightZ, r, g, b, intensity)
+            } else null
+
+            if (resultPixels != null && resultPixels.size == width * height) {
+                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
+                outBitmap
+            } else {
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "relighting3D error: ${t.message}", t)
+            input
+        }
+    }
+
+    /**
+     * AI Anime Cel-Shading & Kuwahara stylization.
+     */
+    fun animeCelShade(input: Bitmap, radius: Int = 4, edgeStrength: Float = 0.8f, vibrancy: Float = 1.0f): Bitmap {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val inPixels = IntArray(width * height)
+        input.getPixels(inPixels, 0, width, 0, 0, width, height)
+
+        return try {
+            val resultPixels = if (isNativeLibraryLoaded) {
+                animeCelShadeNative(inPixels, width, height, radius, edgeStrength, vibrancy)
+            } else null
+
+            if (resultPixels != null && resultPixels.size == width * height) {
+                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
+                outBitmap
+            } else {
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "animeCelShade error: ${t.message}", t)
+            input
+        }
+    }
+
+    /**
+     * Vintage CCD / Red Halation & Film Grain.
+     */
+    fun vintageHalation(
+        input: Bitmap,
+        halationRadius: Float = 14f,
+        grainStrength: Float = 0.5f,
+        chromaticShift: Float = 0.6f,
+        warmth: Float = 1.0f
+    ): Bitmap {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val inPixels = IntArray(width * height)
+        input.getPixels(inPixels, 0, width, 0, 0, width, height)
+
+        return try {
+            val resultPixels = if (isNativeLibraryLoaded) {
+                vintageHalationNative(inPixels, width, height, halationRadius, grainStrength, chromaticShift, warmth)
+            } else null
+
+            if (resultPixels != null && resultPixels.size == width * height) {
+                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
+                outBitmap
+            } else {
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "vintageHalation error: ${t.message}", t)
+            input
+        }
+    }
+
+    /**
+     * Colorize Old B&W Photos with perceptual skin and environment chrominance mapping.
+     */
+    fun colorizeGrayscale(
+        input: Bitmap,
+        personMask: FloatArray,
+        skinWarmth: Float = 1.0f,
+        skyCyan: Float = 1.0f
+    ): Bitmap {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val inPixels = IntArray(width * height)
+        input.getPixels(inPixels, 0, width, 0, 0, width, height)
+
+        return try {
+            val resultPixels = if (isNativeLibraryLoaded && personMask.size == width * height) {
+                colorizeGrayscaleNative(inPixels, personMask, width, height, skinWarmth, skyCyan)
+            } else null
+
+            if (resultPixels != null && resultPixels.size == width * height) {
+                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
+                outBitmap
+            } else {
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "colorizeGrayscale error: ${t.message}", t)
+            input
+        }
+    }
+
+    /**
+     * Studio Product Drop Shadow and Sticker Outline.
+     */
+    fun studioShadowOutline(
+        input: Bitmap,
+        mask: FloatArray,
+        shadowDx: Int = 12,
+        shadowDy: Int = 20,
+        shadowRadius: Int = 16,
+        shadowAlpha: Float = 0.65f,
+        outlineWidth: Int = 10,
+        outlineColor: Int = android.graphics.Color.WHITE
+    ): Bitmap {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val inPixels = IntArray(width * height)
+        input.getPixels(inPixels, 0, width, 0, 0, width, height)
+
+        return try {
+            val resultPixels = if (isNativeLibraryLoaded && mask.size == width * height) {
+                studioShadowOutlineNative(
+                    inPixels, mask, width, height,
+                    shadowDx, shadowDy, shadowRadius, shadowAlpha, outlineWidth, outlineColor
+                )
+            } else null
+
+            if (resultPixels != null && resultPixels.size == width * height) {
+                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
+                outBitmap
+            } else {
+                input
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "studioShadowOutline error: ${t.message}", t)
+            input
+        }
     }
 }

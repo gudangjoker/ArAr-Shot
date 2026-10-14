@@ -10,6 +10,9 @@ import com.ararshot.app.engine.BackgroundRemover
 import com.ararshot.app.engine.BgReplaceConfig
 import com.ararshot.app.engine.ImageEnhancerNative
 import com.ararshot.app.engine.ImageUtils
+import com.ararshot.app.engine.PassportBgColor
+import com.ararshot.app.engine.PassportPhotoMaker
+import com.ararshot.app.engine.PassportSize
 import com.ararshot.app.engine.TextOverlayConfig
 import com.ararshot.app.engine.TextStyler
 import com.ararshot.app.engine.TileProcessor
@@ -29,7 +32,13 @@ sealed class ProcessState {
 
 enum class EditorTab {
     AI_ENHANCE,
+    MAGIC_ERASER,
+    DEPTH_BOKEH_3D,
     BG_REMOVE,
+    COLORIZE,
+    ANIME_STYLE,
+    PASSPORT_PHOTO,
+    VINTAGE_CCD,
     TEXT_TYPOGRAPHY,
     COLOR_GRADING,
     CROP_TRANSFORM,
@@ -77,6 +86,10 @@ class EnhancerViewModel : ViewModel() {
     private val _collageBitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
     val collageBitmaps: StateFlow<List<Bitmap>> = _collageBitmaps.asStateFlow()
 
+    // Magic Eraser Mask State
+    private val _inpaintMask = MutableStateFlow<Bitmap?>(null)
+    val inpaintMask: StateFlow<Bitmap?> = _inpaintMask.asStateFlow()
+
     fun setCurrentTab(tab: EditorTab) {
         _currentTab.value = tab
     }
@@ -87,6 +100,7 @@ class EnhancerViewModel : ViewModel() {
         _enhancedAiBitmap.value = null
         _colorState.value = ColorGradingState()
         _processState.value = ProcessState.Idle
+        _inpaintMask.value = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
     }
 
     fun loadFromUri(context: Context, uri: Uri) {
@@ -184,6 +198,230 @@ class EnhancerViewModel : ViewModel() {
                 _workingBitmap.value = result
                 _enhancedAiBitmap.value = result
                 _processState.value = ProcessState.Success(result, "Teks berhasil ditambahkan!")
+            }
+        }
+    }
+
+    /**
+     * 1. Magic Eraser / Object Removal
+     */
+    fun runMagicEraser(radius: Int = 6) {
+        val src = _workingBitmap.value ?: return
+        val mask = _inpaintMask.value ?: return
+
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.2f, "AI Magic Eraser sedang menghapus objek...")
+            try {
+                val result = ImageEnhancerNative.inpaint(src, mask, radius)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _inpaintMask.value = Bitmap.createBitmap(result.width, result.height, Bitmap.Config.ARGB_8888)
+                    _processState.value = ProcessState.Success(result, "Objek berhasil dihapus mulus!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Magic Eraser error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal menghapus objek: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun clearInpaintMask() {
+        val current = _workingBitmap.value ?: return
+        _inpaintMask.value = Bitmap.createBitmap(current.width, current.height, Bitmap.Config.ARGB_8888)
+    }
+
+    /**
+     * 2. AI Depth Bokeh & 3D Relighting
+     */
+    fun runDepthBokeh(blurRadius: Float, focusDepth: Float = 1.0f) {
+        val src = _workingBitmap.value ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.25f, "Menghitung Depth Map AI & Optical Lens Bokeh...")
+            try {
+                val depthMask = BackgroundRemover.getFloatMask(src)
+                val result = ImageEnhancerNative.depthBokeh(src, depthMask, blurRadius, focusDepth)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _processState.value = ProcessState.Success(result, "Efek DSLR Lens Bokeh berhasil diterapkan!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Depth Bokeh error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal memproses bokeh: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun run3DRelighting(lightX: Float, lightY: Float, lightZ: Float, lightColor: Int, intensity: Float) {
+        val src = _workingBitmap.value ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.25f, "Menggeser arah cahaya studio 3D...")
+            try {
+                val depthMask = BackgroundRemover.getFloatMask(src)
+                val result = ImageEnhancerNative.relighting3D(src, depthMask, lightX, lightY, lightZ, lightColor, intensity)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _processState.value = ProcessState.Success(result, "Tata cahaya studio 3D berhasil diterapkan!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "3D Relighting error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal mengatur relighting: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 3. Text Behind Subject (Sandwich Compositing)
+     */
+    fun runTextBehindSubject() {
+        val src = _workingBitmap.value ?: return
+        val config = _textConfig.value
+
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.3f, "Menyusun layer teks di belakang subjek...")
+            try {
+                val result = BackgroundRemover.renderTextBehindSubject(src, config)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _processState.value = ProcessState.Success(result, "Teks di belakang subjek berhasil dibuat!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Text Behind Subject error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal menaruh teks di belakang subjek: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 4. Colorize Old B&W Photos
+     */
+    fun runColorize(skinWarmth: Float = 1.0f, skyCyan: Float = 1.0f) {
+        val src = _workingBitmap.value ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.25f, "AI sedang mewarnai foto hitam-putih...")
+            try {
+                val personMask = BackgroundRemover.getFloatMask(src)
+                val result = ImageEnhancerNative.colorizeGrayscale(src, personMask, skinWarmth, skyCyan)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _processState.value = ProcessState.Success(result, "Foto hitam-putih berhasil diwarnai secara alami!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Colorize error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal mewarnai foto: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 5. AI Anime / Ghibli Cel-Shading Style Transfer
+     */
+    fun runAnimeCelShade(radius: Int = 4, edgeStrength: Float = 0.8f, vibrancy: Float = 1.0f) {
+        val src = _workingBitmap.value ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.3f, "Menerapkan AI Anime Cel-Shading & Kontur Tinta...")
+            try {
+                val result = ImageEnhancerNative.animeCelShade(src, radius, edgeStrength, vibrancy)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _processState.value = ProcessState.Success(result, "Foto berhasil diubah ke gaya Anime / Ghibli!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Anime style error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal menerapkan gaya anime: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 6. AI Passport / ID Photo Maker & 4R Sheet
+     */
+    fun runPassportPhoto(size: PassportSize, bgColor: PassportBgColor) {
+        val src = _workingBitmap.value ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.3f, "Membuat pasfoto resmi ${size.displayName}...")
+            try {
+                val result = PassportPhotoMaker.generateSinglePassport(src, size, bgColor)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _processState.value = ProcessState.Success(result, "Pasfoto ${size.displayName} berhasil dibuat!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Passport error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal membuat pasfoto: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun generatePassport4RSheet(size: PassportSize, bgColor: PassportBgColor) {
+        val src = _workingBitmap.value ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.4f, "Menyusun lembar cetak 4R grid...")
+            try {
+                val single = PassportPhotoMaker.generateSinglePassport(src, size, bgColor)
+                val sheet = PassportPhotoMaker.generate4RPrintSheet(single, size)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = sheet
+                    _enhancedAiBitmap.value = sheet
+                    _processState.value = ProcessState.Success(sheet, "Lembar cetak 4R siap print berhasil dibuat!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "4R Sheet error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal menyusun lembar cetak: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 7. Vintage CCD / Film Halation & Retro Date Stamp
+     */
+    fun runVintageHalation(
+        radius: Float = 14f,
+        grain: Float = 0.5f,
+        chromatic: Float = 0.6f,
+        warmth: Float = 1.0f,
+        dateStamp: String? = "'98 10 14"
+    ) {
+        val src = _workingBitmap.value ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.25f, "Menerapkan Red Halation, Film Grain & Nada CCD 2000-an...")
+            try {
+                var result = ImageEnhancerNative.vintageHalation(src, radius, grain, chromatic, warmth)
+                if (!dateStamp.isNullOrBlank()) {
+                    result = ImageUtils.addRetroDateStamp(result, dateStamp)
+                }
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = result
+                    _enhancedAiBitmap.value = result
+                    _processState.value = ProcessState.Success(result, "Gaya Vintage Digicam CCD berhasil diterapkan!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Vintage halation error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal menerapkan gaya vintage: ${e.message}")
+                }
             }
         }
     }
