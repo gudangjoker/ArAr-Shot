@@ -1,4 +1,4 @@
-name: Build ArAr Shot APK (Personal Release)
+﻿name: Build ArAr Shot APK (Personal Release)
 
 on:
   push:
@@ -23,12 +23,9 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android NDK & CMake
+      - name: Accept Android SDK Licenses
         run: |
-          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1" || true
+          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Setup NCNN Android Vulkan SDK
         run: |
@@ -53,7 +50,7 @@ jobs:
           fi
 
       - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew || true
+        run: chmod +x gradlew
 
       - name: Build Signed APK (Release & Debug)
         run: ./gradlew assembleRelease assembleDebug --stacktrace
