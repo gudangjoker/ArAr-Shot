@@ -11,6 +11,9 @@ if(EXISTS "${NCNN_DIR}")
     message(STATUS "Found NCNN SDK at: ${NCNN_DIR}")
     set(ncnn_DIR "${NCNN_DIR}")
     find_package(ncnn REQUIRED)
+    if(TARGET ncnn)
+        set_target_properties(ncnn PROPERTIES INTERFACE_COMPILE_OPTIONS "")
+    endif()
     add_definitions(-DUSE_NCNN=1)
     set(USE_NCNN_ENABLED TRUE)
 else()
@@ -50,3 +53,9 @@ else()
         ${jnigraphics-lib}
     )
 endif()
+
+target_compile_options(
+    arar_engine
+    PRIVATE
+    -fexceptions
+)

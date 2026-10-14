@@ -87,7 +87,10 @@ object ImageEnhancerNative {
     /**
      * Initializes NCNN Vulkan compute and loads Real-ESRGAN model weights from APK assets.
      */
+    @Synchronized
     fun initModels(context: Context): Boolean {
+        if (isModelLoaded) return true
+
         if (!ensureNativeLoaded()) {
             Log.w(TAG, "Native library not loaded. Image enhancement will use mathematical fallbacks.")
             return false
