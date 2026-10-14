@@ -59,18 +59,30 @@ jobs:
       - name: Build Signed APK (Release & Debug)
         run: ./gradlew assembleRelease assembleDebug --stacktrace
 
+      - name: Prepare Named Release APKs
+        run: |
+          mkdir -p release_assets
+          for f in app/build/outputs/apk/release/*.apk; do
+            cp "$f" "release_assets/ArAr-Shot-v.1.0.apk"
+            cp "$f" "release_assets/ArAr-Shot-v.1.0-release.apk"
+          done
+          for f in app/build/outputs/apk/debug/*.apk; do
+            cp "$f" "release_assets/ArAr-Shot-v.1.0-debug.apk"
+          done
+          ls -la release_assets/
+
       - name: Upload Signed Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ArArShot-v1.0-Personal-Release-APK
-          path: app/build/outputs/apk/release/*.apk
+          path: release_assets/ArAr-Shot-v.1.0*.apk
           if-no-files-found: error
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ArArShot-v1.0-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          path: release_assets/ArAr-Shot-v.1.0-debug.apk
           if-no-files-found: warn
 
       - name: Publish Official GitHub Release
@@ -80,8 +92,7 @@ jobs:
           tag_name: v1.0.0
           name: "ArAr Shot v.1.0 (Personal Offline Release)"
           body_path: RELEASE_NOTES.md
-          files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk
+          make_latest: true
+          files: release_assets/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

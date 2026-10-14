@@ -53,9 +53,8 @@ ArAr Shot v.1.0 adalah aplikasi peningkatan kualitas foto (*photo enhancer & sup
 
 ### 📲 Panduan Instalasi di Ponsel Android
 
-1. Unduh file `ArArShot-Personal-Release-APK` dari tab **Actions > Artifacts** atau halaman **Releases**.
-2. Ekstrak file zip hasil unduhan untuk mendapatkan file `app-release.apk`.
-3. Pindahkan file `.apk` ke ponsel Android Anda (via kabel data USB, WhatsApp, atau Telegram).
-4. Tap file `.apk` di ponsel Anda untuk memulai proses pemasangan:
-   - Jika muncul peringatan *"Install from unknown sources"*, pilih **Izinkan (Allow)**.
-5. Selesai! Aplikasi langsung dapat digunakan secara penuh tanpa koneksi internet.
+1. Unduh file **`ArAr-Shot-v.1.0.apk`** (atau `ArAr-Shot-v.1.0-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
+2. Pindahkan file `.apk` ke ponsel Android Anda (atau download langsung melalui browser ponsel).
+3. Buka/Tap file `ArAr-Shot-v.1.0.apk` di ponsel Anda untuk memulai proses pemasangan:
+   - Jika muncul peringatan *"Install unknown apps / Sumber tidak dikenal"*, pilih **Izinkan (Allow)**.
+4. Selesai! Aplikasi langsung dapat dibuka dan digunakan dengan logo kamera futuristik terbaru tanpa koneksi internet.

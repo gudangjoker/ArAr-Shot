@@ -8,6 +8,10 @@ android {
     namespace = "com.ararshot.app"
     compileSdk = 34
 
+    base {
+        archivesName.set("ArAr-Shot-v.1.0")
+    }
+
     defaultConfig {
         applicationId = "com.ararshot.app"
         minSdk = 24
