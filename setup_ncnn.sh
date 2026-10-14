@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -e
 
 NCNN_VERSION="20240820"
@@ -41,3 +41,12 @@ fi
 rm -rf "$TEMP_DIR"
 echo "=== NCNN SDK successfully installed at ${TARGET_DIR} ==="
 ls -la "$TARGET_DIR"
+
+echo "=== Copying shared libncnn.so to jniLibs for APK packaging ==="
+for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+    if [ -f "$TARGET_DIR/$abi/lib/libncnn.so" ]; then
+        mkdir -p "app/src/main/jniLibs/$abi"
+        cp -f "$TARGET_DIR/$abi/lib/libncnn.so" "app/src/main/jniLibs/$abi/libncnn.so"
+        echo "Copied libncnn.so to app/src/main/jniLibs/$abi"
+    fi
+done

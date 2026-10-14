@@ -57,35 +57,41 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize NCNN Vulkan Models safely in background on app startup
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                Log.d("MainActivity", "Starting NCNN model initialization in background coroutine...")
-                val success = ImageEnhancerNative.initModels(applicationContext)
-                withContext(Dispatchers.Main) {
-                    isModelInitialized.value = success
-                    Log.d("MainActivity", "Model initialization finished. Ready = $success")
+        try {
+            setContent {
+                MaterialTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        ArArShotApp(
+                            isModelReady = isModelInitialized.value,
+                            onInitRequested = {
+                                lifecycleScope.launch(Dispatchers.IO) {
+                                    try {
+                                        Log.d("MainActivity", "Initializing native enhancer engine...")
+                                        val success = ImageEnhancerNative.initModels(applicationContext)
+                                        withContext(Dispatchers.Main) {
+                                            isModelInitialized.value = success
+                                            Log.d("MainActivity", "Model ready = $success")
+                                        }
+                                    } catch (t: Throwable) {
+                                        Log.e("MainActivity", "Error during model init: ${t.message}", t)
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
-            } catch (t: Throwable) {
-                Log.e("MainActivity", "Caught background initialization error: ${t.message}", t)
             }
-        }
-
-        setContent {
-            MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    ArArShotApp(isModelReady = isModelInitialized.value)
-                }
-            }
+        } catch (t: Throwable) {
+            Log.e("MainActivity", "Fatal error during setContent: ${t.message}", t)
         }
     }
 }
 
 @Composable
-fun ArArShotApp(isModelReady: Boolean) {
+fun ArArShotApp(isModelReady: Boolean, onInitRequested: () -> Unit = {}) {
     val context = LocalContext.current
 
     // Determine required permissions based on Android SDK level
@@ -128,11 +134,6 @@ fun ArArShotApp(isModelReady: Boolean) {
         } else {
             results[Manifest.permission.READ_EXTERNAL_STORAGE] ?: storageGranted
         }
-    }
-
-    // Auto-prompt permissions on initial launch
-    LaunchedEffect(Unit) {
-        permissionLauncher.launch(requiredPermissions)
     }
 
     Scaffold { innerPadding ->
@@ -241,7 +242,7 @@ fun ArArShotApp(isModelReady: Boolean) {
             }
 
             Button(
-                onClick = { /* Pick and enhance image */ },
+                onClick = { onInitRequested() },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(text = "Enhance Photo (4x Super-Resolution)")
