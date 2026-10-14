@@ -1,6 +1,6 @@
-﻿# 📸 ArAr Shot — Release Notes
+# 📸 ArAr Shot v.1.0 — Release Notes
 
-## Versi 1.0.0 (Personal Offline Release)
+## Versi 1.0 (ArAr Shot v.1.0 Personal Offline Release)
 **Tanggal Rilis**: 14 Oktober 2026  
 **Package Name**: `com.ararshot.app`  
 **Tipe Rilis**: Edisi Pribadi (Offline Standalone Build)  
@@ -9,7 +9,7 @@
 ---
 
 ### ✨ Ringkasan Rilis
-ArAr Shot v1.0.0 adalah aplikasi peningkatan kualitas foto (*photo enhancer & super-resolution*) bertenaga AI lokal yang dirancang khusus untuk pemakaian pribadi dengan fokus utama pada **kecepatan pemrosesan hardware lokal, privasi 100%, dan kemudahan instalasi**.
+ArAr Shot v.1.0 adalah aplikasi peningkatan kualitas foto (*photo enhancer & super-resolution*) bertenaga AI lokal yang dirancang khusus untuk pemakaian pribadi dengan fokus utama pada **kecepatan pemrosesan hardware lokal, privasi 100%, dan kemudahan instalasi**. Dilengkapi dengan logo & ikon kamera futuristik gradien terbaru.
 
 ---
 
