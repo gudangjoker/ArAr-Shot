@@ -1,10 +1,15 @@
 # ProGuard rules for ArAr Shot C++ Native Engine & JNI Bridge
 
-# Keep JNI Native Bridge classes & methods
--keep class com.example.engine.ImageEnhancerNative {
+# Keep JNI Native Bridge classes & methods for com.ararshot.app
+-keep class com.ararshot.app.engine.ImageEnhancerNative {
     *;
 }
 
+-keep class com.ararshot.app.** {
+    *;
+}
+
+# Keep any native methods
 -keepclasseswithmembernames class * {
     native <methods>;
 }

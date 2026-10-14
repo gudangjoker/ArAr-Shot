@@ -243,7 +243,7 @@ void cosineTileBlend(const uint32_t* tile, int tileW, int tileH, int dstX, int d
 extern "C" {
 
 JNIEXPORT jboolean JNICALL
-Java_com_example_engine_ImageEnhancerNative_loadModelNative(
+Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(
     JNIEnv* env,
     jobject thiz,
     jobject assetManager,
@@ -315,7 +315,7 @@ Java_com_example_engine_ImageEnhancerNative_loadModelNative(
 }
 
 JNIEXPORT jintArray JNICALL
-Java_com_example_engine_ImageEnhancerNative_processTileNative(
+Java_com_ararshot_app_engine_ImageEnhancerNative_processTileNative(
     JNIEnv* env,
     jobject thiz,
     jintArray inPixels,
@@ -420,7 +420,7 @@ Java_com_example_engine_ImageEnhancerNative_processTileNative(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_example_engine_ImageEnhancerNative_processBitmapNative(
+Java_com_ararshot_app_engine_ImageEnhancerNative_processBitmapNative(
     JNIEnv* env,
     jobject thiz,
     jobject bitmapIn,
@@ -460,7 +460,7 @@ Java_com_example_engine_ImageEnhancerNative_processBitmapNative(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_example_engine_ImageEnhancerNative_blendTileNative(
+Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileNative(
     JNIEnv* env,
     jobject thiz,
     jintArray tilePixels,
@@ -491,6 +491,62 @@ Java_com_example_engine_ImageEnhancerNative_blendTileNative(
     env->ReleaseIntArrayElements(tilePixels, tile, JNI_ABORT);
     env->ReleaseIntArrayElements(targetPixels, target, 0);
     return JNI_TRUE;
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compatible wrappers for com.example.engine.ImageEnhancerNative
+// ---------------------------------------------------------------------------
+
+JNIEXPORT jboolean JNICALL
+Java_com_example_engine_ImageEnhancerNative_loadModelNative(
+    JNIEnv* env,
+    jobject thiz,
+    jobject assetManager,
+    jstring paramPath,
+    jstring binPath
+) {
+    return Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(env, thiz, assetManager, paramPath, binPath);
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_example_engine_ImageEnhancerNative_processTileNative(
+    JNIEnv* env,
+    jobject thiz,
+    jintArray inPixels,
+    jint width,
+    jint height,
+    jint mode,
+    jfloat strength
+) {
+    return Java_com_ararshot_app_engine_ImageEnhancerNative_processTileNative(env, thiz, inPixels, width, height, mode, strength);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_example_engine_ImageEnhancerNative_processBitmapNative(
+    JNIEnv* env,
+    jobject thiz,
+    jobject bitmapIn,
+    jobject bitmapOut,
+    jint mode,
+    jfloat strength
+) {
+    return Java_com_ararshot_app_engine_ImageEnhancerNative_processBitmapNative(env, thiz, bitmapIn, bitmapOut, mode, strength);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_example_engine_ImageEnhancerNative_blendTileNative(
+    JNIEnv* env,
+    jobject thiz,
+    jintArray tilePixels,
+    jint tileW,
+    jint tileH,
+    jint dstX,
+    jint dstY,
+    jintArray targetPixels,
+    jint targetW,
+    jint targetH
+) {
+    return Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileNative(env, thiz, tilePixels, tileW, tileH, dstX, dstY, targetPixels, targetW, targetH);
 }
 
 } // extern "C"

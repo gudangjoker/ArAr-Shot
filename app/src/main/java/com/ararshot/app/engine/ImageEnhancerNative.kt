@@ -1,4 +1,4 @@
-package com.example.engine
+package com.ararshot.app.engine
 
 import android.content.Context
 import android.content.res.AssetManager
@@ -17,12 +17,21 @@ object ImageEnhancerNative {
     private var isModelLoaded = false
 
     init {
+        // Attempt to load libncnn first (shared dependency on Android)
+        try {
+            System.loadLibrary("ncnn")
+            Log.i(TAG, "libncnn loaded successfully.")
+        } catch (t: Throwable) {
+            Log.w(TAG, "libncnn load status: ${t.message}")
+        }
+
+        // Load arar_engine native library
         try {
             System.loadLibrary("arar_engine")
             isNativeLibraryLoaded = true
             Log.i(TAG, "Native library 'arar_engine' loaded successfully.")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "Failed to load native library 'arar_engine': ${e.message}")
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to load 'arar_engine' native library: ${t.message}")
             isNativeLibraryLoaded = false
         }
     }
@@ -67,7 +76,7 @@ object ImageEnhancerNative {
      */
     fun initModels(context: Context): Boolean {
         if (!isNativeLibraryLoaded) {
-            Log.w(TAG, "Native library not loaded. Image enhancement will use software fallbacks.")
+            Log.w(TAG, "Native library not loaded. Image enhancement will use mathematical fallbacks.")
             return false
         }
 
@@ -86,8 +95,8 @@ object ImageEnhancerNative {
                 Log.w(TAG, "loadModelNative returned false. Bicubic upscale fallback will be used.")
             }
             success
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception during initModels: ${e.message}", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Exception during initModels: ${t.message}", t)
             false
         }
     }
@@ -104,7 +113,6 @@ object ImageEnhancerNative {
         val outPixels = if (isNativeLibraryLoaded) {
             processTileNative(inPixels, width, height, MODE_SUPER_RESOLUTION, strength)
         } else {
-            // JVM fallback if native lib is missing entirely
             inPixels
         }
 

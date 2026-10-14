@@ -42,6 +42,52 @@ void cosineTileBlend(const uint32_t* tile, int tileW, int tileH, int dstX, int d
 extern "C" {
 #endif
 
+// JNI signatures for com.ararshot.app.engine.ImageEnhancerNative
+JNIEXPORT jboolean JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(
+    JNIEnv* env,
+    jobject thiz,
+    jobject assetManager,
+    jstring paramPath,
+    jstring binPath
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_processTileNative(
+    JNIEnv* env,
+    jobject thiz,
+    jintArray inPixels,
+    jint width,
+    jint height,
+    jint mode,
+    jfloat strength
+);
+
+JNIEXPORT jboolean JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_processBitmapNative(
+    JNIEnv* env,
+    jobject thiz,
+    jobject bitmapIn,
+    jobject bitmapOut,
+    jint mode,
+    jfloat strength
+);
+
+JNIEXPORT jboolean JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileNative(
+    JNIEnv* env,
+    jobject thiz,
+    jintArray tilePixels,
+    jint tileW,
+    jint tileH,
+    jint dstX,
+    jint dstY,
+    jintArray targetPixels,
+    jint targetW,
+    jint targetH
+);
+
+// Backward-compatible signatures for com.example.engine.ImageEnhancerNative
 JNIEXPORT jboolean JNICALL
 Java_com_example_engine_ImageEnhancerNative_loadModelNative(
     JNIEnv* env,

@@ -1,4 +1,4 @@
-package com.example
+package com.ararshot.app
 
 import android.Manifest
 import android.content.Context
@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.example.engine.ImageEnhancerNative
+import com.ararshot.app.engine.ImageEnhancerNative
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,13 +52,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize NCNN Vulkan Models in background on app startup
+        // Initialize NCNN Vulkan Models safely in background on app startup
         lifecycleScope.launch(Dispatchers.IO) {
-            Log.d("MainActivity", "Starting NCNN model initialization in background coroutine...")
-            val success = ImageEnhancerNative.initModels(applicationContext)
-            withContext(Dispatchers.Main) {
-                isModelInitialized.value = success
-                Log.d("MainActivity", "Model initialization finished. Ready = $success")
+            try {
+                Log.d("MainActivity", "Starting NCNN model initialization in background coroutine...")
+                val success = ImageEnhancerNative.initModels(applicationContext)
+                withContext(Dispatchers.Main) {
+                    isModelInitialized.value = success
+                    Log.d("MainActivity", "Model initialization finished. Ready = $success")
+                }
+            } catch (t: Throwable) {
+                Log.e("MainActivity", "Caught background initialization error: ${t.message}", t)
             }
         }
 
