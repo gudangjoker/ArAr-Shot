@@ -269,17 +269,12 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(
 
 #if NCNN_VULKAN
     g_has_vulkan = false;
-    try {
-        int gpu_count = ncnn::get_gpu_count();
-        if (gpu_count > 0) {
-            g_has_vulkan = true;
-            LOGI("loadModelNative: Vulkan compute available (GPU count = %d)", gpu_count);
-        } else {
-            LOGI("loadModelNative: No Vulkan GPU detected, using high-performance CPU inference");
-        }
-    } catch (...) {
-        g_has_vulkan = false;
-        LOGW("loadModelNative: Exception detecting Vulkan GPU, falling back to CPU");
+    int gpu_count = ncnn::get_gpu_count();
+    if (gpu_count > 0) {
+        g_has_vulkan = true;
+        LOGI("loadModelNative: Vulkan compute available (GPU count = %d)", gpu_count);
+    } else {
+        LOGI("loadModelNative: No Vulkan GPU detected, using high-performance CPU inference");
     }
 #else
     g_has_vulkan = false;

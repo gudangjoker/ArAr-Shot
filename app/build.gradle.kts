@@ -4,13 +4,14 @@ plugins {
     alias(libs.plugins.google.devtools.ksp)
 }
 
+base {
+    archivesName.set("ArAr-Shot-v.1.0.1")
+}
+
 android {
     namespace = "com.ararshot.app"
     compileSdk = 34
-
-    base {
-        archivesName.set("ArAr-Shot-v.1.0.1")
-    }
+    ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.ararshot.app"

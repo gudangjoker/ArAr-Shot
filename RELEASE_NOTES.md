@@ -41,11 +41,11 @@ ArAr Shot v.1.0.1 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardw
 
 | Parameter | Spesifikasi |
 | :--- | :--- |
-| **Versi Aplikasi** | `1.0` (Version Code: `1`) |
+| **Versi Aplikasi** | `1.0.1` (Version Code: `2`) |
 | **Target SDK** | Android 14 (API Level 34) |
 | **Minimum SDK** | Android 7.0 Nougat (API Level 24) |
-| **Arsitektur CPU (ABI)** | `arm64-v8a` (64-bit modern), `armeabi-v7a` (32-bit legacy) |
-| **Ukuran APK Rilis** | **~21.8 MB** (Semua model AI dan native library sudah di dalam APK) |
+| **Arsitektur CPU (ABI)** | `arm64-v8a` (64-bit modern), `armeabi-v7a` (32-bit legacy), `x86_64` |
+| **Ukuran APK Rilis** | **~54.8 MB** (Semua model AI dan native library sudah di dalam APK) |
 | **UI Framework** | Jetpack Compose + Material 3 Design |
 | **Build System** | Gradle 8.9 + AGP 8.6.1 + CMake 3.22.1 + NDK 25/26 |
 

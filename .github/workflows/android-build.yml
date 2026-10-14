@@ -27,9 +27,11 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Accept Android SDK Licenses
+      - name: Setup Android NDK and CMake
         run: |
-          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "cmake;3.22.1" "ndk;26.1.10909125" || true
+          sudo chown -R $USER:$USER ${ANDROID_HOME} || true
 
       - name: Setup NCNN Android Vulkan SDK
         run: |
@@ -62,14 +64,33 @@ jobs:
       - name: Prepare Named Release APKs
         run: |
           mkdir -p release_assets
+          echo "=== Locating built APKs ==="
+          find app/build/outputs/apk -type f -name "*.apk" -ls
+          
+          # Copy release APK
           for f in app/build/outputs/apk/release/*.apk; do
-            cp "$f" "release_assets/ArAr-Shot-v.1.0.1.apk"
-            cp "$f" "release_assets/ArAr-Shot-v.1.0.1-release.apk"
+            if [ -f "$f" ]; then
+              cp -v "$f" "release_assets/ArAr-Shot-v.1.0.1.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v.1.0.1-release.apk"
+              break
+            fi
           done
+          
+          # Copy debug APK
           for f in app/build/outputs/apk/debug/*.apk; do
-            cp "$f" "release_assets/ArAr-Shot-v.1.0.1-debug.apk"
+            if [ -f "$f" ]; then
+              cp -v "$f" "release_assets/ArAr-Shot-v.1.0.1-debug.apk"
+              break
+            fi
           done
-          ls -la release_assets/
+          
+          # Verify release APK was copied
+          if [ ! -f "release_assets/ArAr-Shot-v.1.0.1.apk" ]; then
+            echo "ERROR: release_assets/ArAr-Shot-v.1.0.1.apk not found!"
+            exit 1
+          fi
+          
+          ls -lh release_assets/
 
       - name: Upload Signed Release APK Artifact
         uses: actions/upload-artifact@v4
