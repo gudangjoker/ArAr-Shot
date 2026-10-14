@@ -6,8 +6,12 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ararshot.app.engine.BackgroundRemover
+import com.ararshot.app.engine.BgReplaceConfig
 import com.ararshot.app.engine.ImageEnhancerNative
 import com.ararshot.app.engine.ImageUtils
+import com.ararshot.app.engine.TextOverlayConfig
+import com.ararshot.app.engine.TextStyler
 import com.ararshot.app.engine.TileProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +29,8 @@ sealed class ProcessState {
 
 enum class EditorTab {
     AI_ENHANCE,
+    BG_REMOVE,
+    TEXT_TYPOGRAPHY,
     COLOR_GRADING,
     CROP_TRANSFORM,
     EXPORT
@@ -59,6 +65,14 @@ class EnhancerViewModel : ViewModel() {
     private val _colorState = MutableStateFlow(ColorGradingState())
     val colorState: StateFlow<ColorGradingState> = _colorState.asStateFlow()
 
+    // Background Replace Config State
+    private val _bgConfig = MutableStateFlow(BgReplaceConfig())
+    val bgConfig: StateFlow<BgReplaceConfig> = _bgConfig.asStateFlow()
+
+    // Text Overlay Config State
+    private val _textConfig = MutableStateFlow(TextOverlayConfig())
+    val textConfig: StateFlow<TextOverlayConfig> = _textConfig.asStateFlow()
+
     // Collage Studio State
     private val _collageBitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
     val collageBitmaps: StateFlow<List<Bitmap>> = _collageBitmaps.asStateFlow()
@@ -92,7 +106,7 @@ class EnhancerViewModel : ViewModel() {
     }
 
     /**
-     * Executes AI Enhancement using TileProcessor with real-time progress callbacks.
+     * Executes AI Super-Resolution with TileProcessor.
      */
     fun runAiEnhance(context: Context, mode: Int, strength: Float) {
         val src = _workingBitmap.value ?: return
@@ -129,7 +143,53 @@ class EnhancerViewModel : ViewModel() {
     }
 
     /**
-     * Applies Color Grading to the current base image.
+     * Executes on-device AI Background Removal or Replacement.
+     */
+    fun runBackgroundReplace(config: BgReplaceConfig) {
+        _bgConfig.value = config
+        val src = _workingBitmap.value ?: return
+
+        viewModelScope.launch(Dispatchers.Default) {
+            _processState.value = ProcessState.Processing(0.2f, "AI sedang mensegmentasi subjek...")
+            try {
+                val processed = BackgroundRemover.processBackground(src, config)
+                withContext(Dispatchers.Main) {
+                    _workingBitmap.value = processed
+                    _enhancedAiBitmap.value = processed
+                    _processState.value = ProcessState.Success(processed, "Latar belakang berhasil diproses!")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Background process error: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _processState.value = ProcessState.Error("Gagal memproses latar belakang: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Burns styled text overlay onto the image.
+     */
+    fun updateTextOverlay(config: TextOverlayConfig) {
+        _textConfig.value = config
+    }
+
+    fun applyTextOverlay() {
+        val src = _workingBitmap.value ?: return
+        val config = _textConfig.value
+
+        viewModelScope.launch(Dispatchers.Default) {
+            val result = TextStyler.drawTextOnBitmap(src, config)
+            withContext(Dispatchers.Main) {
+                _workingBitmap.value = result
+                _enhancedAiBitmap.value = result
+                _processState.value = ProcessState.Success(result, "Teks berhasil ditambahkan!")
+            }
+        }
+    }
+
+    /**
+     * Applies Color Grading.
      */
     fun updateColorGrading(newColorState: ColorGradingState) {
         _colorState.value = newColorState
@@ -151,7 +211,7 @@ class EnhancerViewModel : ViewModel() {
     }
 
     /**
-     * Rotates the working image by 90 degrees.
+     * Transforms: Rotate, Flip, Crop.
      */
     fun rotateImage() {
         val current = _workingBitmap.value ?: return
@@ -164,9 +224,6 @@ class EnhancerViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Flips image horizontally.
-     */
     fun flipHorizontal() {
         val current = _workingBitmap.value ?: return
         viewModelScope.launch(Dispatchers.Default) {
@@ -178,9 +235,6 @@ class EnhancerViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Crops image to aspect ratio.
-     */
     fun cropAspect(aspectX: Int, aspectY: Int) {
         val current = _workingBitmap.value ?: return
         viewModelScope.launch(Dispatchers.Default) {
@@ -193,7 +247,7 @@ class EnhancerViewModel : ViewModel() {
     }
 
     /**
-     * Adds photo to collage studio.
+     * Collage Studio State
      */
     fun addCollagePhoto(bitmap: Bitmap) {
         val current = _collageBitmaps.value.toMutableList()

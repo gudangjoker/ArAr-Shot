@@ -31,10 +31,12 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -234,7 +236,35 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. Feature Card: PRO COLOR GRADING & FILTERS
+            // 2. Feature Card: AI BACKGROUND REMOVER & REPLACER
+            StudioFeatureCard(
+                title = "✂️ AI Hapus & Ganti Latar Belakang",
+                description = "Segmentasi neural on-device: hapus background menjadi PNG transparan, warna studio, bokeh blur, atau foto kustom.",
+                icon = Icons.Default.ContentCut,
+                accentColor = Color(0xFFD81B60),
+                onClick = {
+                    pendingTab = EditorTab.BG_REMOVE
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 3. Feature Card: TEXT & TYPOGRAPHY STYLER
+            StudioFeatureCard(
+                title = "✍️ Studio Teks & Tipografi",
+                description = "Tambahkan teks dengan beragam font premium, efek Cyberpunk Neon, 3D Shadow, Outline, dan Badge box.",
+                icon = Icons.Default.TextFields,
+                accentColor = Color(0xFF1E88E5),
+                onClick = {
+                    pendingTab = EditorTab.TEXT_TYPOGRAPHY
+                    galleryLauncher.launch("image/*")
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 4. Feature Card: PRO COLOR GRADING & FILTERS
             StudioFeatureCard(
                 title = "🎨 Pro Color Studio & Filter",
                 description = "Pengaturan presisi Exposure, Contrast, Saturation, Temperature, dan Vignette secara real-time.",
@@ -248,9 +278,9 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 3. Feature Card: CROP & TRANSFORM
+            // 5. Feature Card: CROP & TRANSFORM
             StudioFeatureCard(
-                title = "✂️ Crop & Transform Studio",
+                title = "📐 Crop & Transform Studio",
                 description = "Potong foto ke rasio 1:1, 4:5, 16:9, rotasi presisi 90 derajat, dan flip horizontal/vertikal.",
                 icon = Icons.Default.Crop,
                 accentColor = Color(0xFFE65100),
@@ -262,7 +292,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 4. Feature Card: COLLAGE STUDIO GRID
+            // 6. Feature Card: COLLAGE STUDIO GRID
             StudioFeatureCard(
                 title = "🖼️ Collage Studio Grid",
                 description = "Gabungkan 2 hingga 4 foto menjadi kolase artistik dengan template grid dan margin dinamis.",

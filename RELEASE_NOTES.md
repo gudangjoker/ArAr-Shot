@@ -1,6 +1,6 @@
-# 📸 ArAr Shot Pro v.1.0.4 — Release Notes
+# 📸 ArAr Shot Pro v.1.0.5 — Release Notes
 
-## Versi 1.0.4 (ArAr Shot Pro Full Studio Suite)
+## Versi 1.0.5 (AI Background Remover & Typography Studio)
 **Tanggal Rilis**: 14 Oktober 2026  
 **Package Name**: `com.ararshot.app`  
 **Tipe Rilis**: Edisi Pribadi (Offline Standalone Studio Suite)  
@@ -8,22 +8,19 @@
 
 ---
 
-### ✨ Ringkasan Rilis Penuh (Full Production Suite)
-ArAr Shot Pro v.1.0.4 mengimplementasikan **seluruh blueprint arsitektur profesional lengkap**:
-1. **HomeScreen Studio Hub**:
-   - 🚀 **AI Super-Resolution 4X**: Pemrosesan Real-ESRGAN NCNN Vulkan dengan algoritma dynamic tiling anti-OOM.
-   - 🎨 **Pro Color Studio & Filter**: Pengaturan presisi Exposure, Contrast, Saturation, Temperature, dan Vignette secara real-time.
-   - ✂️ **Crop & Transform Studio**: Rotasi presisi 90°, Flip horisontal/vertikal, dan pemotongan rasio aspek (1:1 Square, 4:5 Portrait, 16:9 Landscape, 9:16 Story).
-   - 🖼️ **Collage Studio Grid**: Penggabungan 2 hingga 4 foto dengan template grid, kontrol margin (spacing), dan sudut membulat (corner radius).
-2. **EditorScreen dengan Interactive Before/After Split Slider**:
-   - Slider geser interaktif untuk membandingkan foto asli vs hasil peningkatan AI secara berdampingan dengan gesture drag real-time.
-   - 4 Tab modular: `[AI Enhance]`, `[Color Grade]`, `[Transform]`, `[Export]`.
-3. **TileProcessor & Anti-OOM Architecture**:
-   - Algoritma pemecahan tile dengan overlap margin untuk mencegah artefak garis sambungan (*seam lines*).
-   - Cosine Hann window tile blending via C++ NDK engine.
-   - Progress bar dinamis (persentase dan nomor tile).
-4. **100% Offline & Privasi Mutlak**:
-   - Bebas pelacak dan tanpa memerlukan koneksi internet apa pun.
+### ✨ Fitur Baru AI Nyata (No-Gimmick Real AI Tools)
+1. **AI Background Remover & Replacer (100% On-Device Neural Segmentation)**:
+   - Menggunakan model segmentasi neural on-device Google ML Kit Selfie Segmentation yang terintegrasi langsung di dalam APK (bekerja 100% offline tanpa cloud).
+   - Menghasilkan alpha cut-out transparan (PNG) berpresisi tinggi dengan edge feathering pada rambut dan batas tubuh.
+   - **Ganti Background Multi-Mode**:
+     - *Warna Studio Solid*: Putih, Hitam, Neon Cyan, Chroma Green, Gold, Maroon, Royal Blue.
+     - *Gradien Studio Lighting*: Dark Studio, Cyberpunk Sunset, Soft Luxury Silver.
+     - *DSLR Bokeh Blur*: Latar belakang asli diburamkan untuk efek portrait depth.
+     - *Ganti Foto dari Galeri*: Mengganti latar belakang dengan foto pemandangan/studio kustom dari galeri pengguna.
+2. **Studio Teks & Tipografi Multi-Font**:
+   - Beragam keluarga font: Modern Sans, Luxury Serif, Cyber Mono, Heavy Impact, Calligraphy Script.
+   - Model gaya teks: Minimalist Clean, Cyberpunk Neon Glow, 3D Shadow Depth, Bold Sticker Outline, dan Instagram Badge Box.
+   - Kontrol presisi: Ukuran teks, posisi vertikal, rotasi derajat, dan warna utama/aksen.
 
 ---
 
@@ -70,11 +67,11 @@ ArAr Shot Pro v.1.0.4 mengimplementasikan **seluruh blueprint arsitektur profesi
 
 | Parameter | Spesifikasi |
 | :--- | :--- |
-| **Versi Aplikasi** | `1.0.4` (Version Code: `5`) |
+| **Versi Aplikasi** | `1.0.5` (Version Code: `6`) |
 | **Target SDK** | Android 14 (API Level 34) |
 | **Minimum SDK** | Android 7.0 Nougat (API Level 24) |
 | **Arsitektur CPU (ABI)** | `arm64-v8a` (64-bit modern), `armeabi-v7a` (32-bit legacy), `x86_64` |
-| **Ukuran APK Rilis** | **~33.5 MB** (Semua model AI dan native library sudah di dalam APK) |
+| **Ukuran APK Rilis** | **~35 MB** (Model NCNN & ML Kit On-Device Neural terintegrasi) |
 | **UI Framework** | Jetpack Compose + Material 3 Design |
 | **Build System** | Gradle 8.9 + AGP 8.6.1 + CMake 3.22.1 + NDK 25/26 |
 
@@ -82,6 +79,6 @@ ArAr Shot Pro v.1.0.4 mengimplementasikan **seluruh blueprint arsitektur profesi
 
 ### 📲 Panduan Instalasi di Ponsel Android
 
-1. Unduh berkas **`ArAr-Shot-v.1.0.4.apk`** (atau `ArAr-Shot-v.1.0.4-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
-2. Buka/Pasang berkas `ArAr-Shot-v.1.0.4.apk` di ponsel Anda.
-3. Nikmati seluruh fitur lengkap: Quick AI Enhance 4X, Pro Color Grading, Crop & Transform, dan Collage Studio Grid!
+1. Unduh berkas **`ArAr-Shot-v.1.0.5.apk`** (atau `ArAr-Shot-v.1.0.5-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
+2. Buka/Pasang berkas `ArAr-Shot-v.1.0.5.apk` di ponsel Anda.
+3. Langsung nikmati seluruh fitur studio: AI 4x Super-Resolution, AI Background Remover/Replacer, Studio Teks & Font, Color Grading, Transform, dan Collage Studio!

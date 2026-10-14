@@ -6,7 +6,7 @@ plugins {
 }
 
 base {
-    archivesName.set("ArAr-Shot-v.1.0.4")
+    archivesName.set("ArAr-Shot-v.1.0.5")
 }
 
 android {
@@ -18,8 +18,8 @@ android {
         applicationId = "com.ararshot.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.0.4"
+        versionCode = 6
+        versionName = "1.0.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -117,6 +117,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.core)
