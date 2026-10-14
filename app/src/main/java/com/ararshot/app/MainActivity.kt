@@ -156,7 +156,7 @@ fun ArArShotApp(isModelReady: Boolean, onInitRequested: () -> Unit = {}) {
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "ArAr Shot v.1.0",
+                text = "ArAr Shot v.1.0.1",
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary

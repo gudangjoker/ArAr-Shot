@@ -63,34 +63,34 @@ jobs:
         run: |
           mkdir -p release_assets
           for f in app/build/outputs/apk/release/*.apk; do
-            cp "$f" "release_assets/ArAr-Shot-v.1.0.apk"
-            cp "$f" "release_assets/ArAr-Shot-v.1.0-release.apk"
+            cp "$f" "release_assets/ArAr-Shot-v.1.0.1.apk"
+            cp "$f" "release_assets/ArAr-Shot-v.1.0.1-release.apk"
           done
           for f in app/build/outputs/apk/debug/*.apk; do
-            cp "$f" "release_assets/ArAr-Shot-v.1.0-debug.apk"
+            cp "$f" "release_assets/ArAr-Shot-v.1.0.1-debug.apk"
           done
           ls -la release_assets/
 
       - name: Upload Signed Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v1.0-Personal-Release-APK
-          path: release_assets/ArAr-Shot-v.1.0*.apk
+          name: ArArShot-v1.0.1-Personal-Release-APK
+          path: release_assets/ArAr-Shot-v.1.0.1*.apk
           if-no-files-found: error
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v1.0-Debug-APK
-          path: release_assets/ArAr-Shot-v.1.0-debug.apk
+          name: ArArShot-v1.0.1-Debug-APK
+          path: release_assets/ArAr-Shot-v.1.0.1-debug.apk
           if-no-files-found: warn
 
       - name: Publish Official GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.0
-          name: "ArAr Shot v.1.0 (Personal Offline Release)"
+          tag_name: v1.0.1
+          name: "ArAr Shot v.1.0.1 (Personal Offline Release)"
           body_path: RELEASE_NOTES.md
           make_latest: true
           files: release_assets/*.apk
