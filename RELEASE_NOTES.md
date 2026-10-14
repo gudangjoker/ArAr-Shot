@@ -1,25 +1,29 @@
-# 📸 ArAr Shot v.1.0.3 — Release Notes
+# 📸 ArAr Shot Pro v.1.0.4 — Release Notes
 
-## Versi 1.0.3 (ArAr Shot v.1.0.3 Interactive Photo Enhancer Release)
+## Versi 1.0.4 (ArAr Shot Pro Full Studio Suite)
 **Tanggal Rilis**: 14 Oktober 2026  
 **Package Name**: `com.ararshot.app`  
-**Tipe Rilis**: Edisi Pribadi (Offline Standalone Build)  
+**Tipe Rilis**: Edisi Pribadi (Offline Standalone Studio Suite)  
 **Status Tanda Tangan**: Signed (Valid RSA 2048-bit Keystore)
 
 ---
 
-### ✨ Ringkasan Rilis
-ArAr Shot v.1.0.3 menghadirkan **Antarmuka Interaktif Lengkap Peningkatan Foto**:
-1. **Pemilih Foto (Gallery Picker)**: Pilih foto mana pun dari galeri perangkat Anda secara langsung.
-2. **Kamera Terintegrasi**: Ambil foto baru langsung dari dalam aplikasi.
-3. **Multi-Mode AI & Native Enhancer**:
-   - ✨ **4x Super-Resolution**: Meningkatkan resolusi 4x lipat menggunakan model AI Real-ESRGAN NCNN Vulkan.
-   - 🚀 **Ultra Enhance**: Kombinasi Bilateral Denoise dan 4x Super-Resolution.
-   - 🔍 **Pertajam Detail**: Filter Unsharp Masking berpresisi tinggi.
-   - 🧼 **Bersihkan Noise**: Algoritma Bilateral Denoising pereduksi bintik foto.
-4. **Perbandingan Langsung (Before & After Tabs)**: Bandingkan foto asli vs foto hasil peningkatan AI dengan satu sentuhan.
-5. **Simpan ke Galeri**: Simpan hasil foto beresolusi tinggi langsung ke folder `Pictures/ArArShot` di penyimpanan HP.
-6. **Indikator Proses Visual**: Menampilkan animasi pemrosesan aktif saat AI sedang merekonstruksi piksel foto.
+### ✨ Ringkasan Rilis Penuh (Full Production Suite)
+ArAr Shot Pro v.1.0.4 mengimplementasikan **seluruh blueprint arsitektur profesional lengkap**:
+1. **HomeScreen Studio Hub**:
+   - 🚀 **AI Super-Resolution 4X**: Pemrosesan Real-ESRGAN NCNN Vulkan dengan algoritma dynamic tiling anti-OOM.
+   - 🎨 **Pro Color Studio & Filter**: Pengaturan presisi Exposure, Contrast, Saturation, Temperature, dan Vignette secara real-time.
+   - ✂️ **Crop & Transform Studio**: Rotasi presisi 90°, Flip horisontal/vertikal, dan pemotongan rasio aspek (1:1 Square, 4:5 Portrait, 16:9 Landscape, 9:16 Story).
+   - 🖼️ **Collage Studio Grid**: Penggabungan 2 hingga 4 foto dengan template grid, kontrol margin (spacing), dan sudut membulat (corner radius).
+2. **EditorScreen dengan Interactive Before/After Split Slider**:
+   - Slider geser interaktif untuk membandingkan foto asli vs hasil peningkatan AI secara berdampingan dengan gesture drag real-time.
+   - 4 Tab modular: `[AI Enhance]`, `[Color Grade]`, `[Transform]`, `[Export]`.
+3. **TileProcessor & Anti-OOM Architecture**:
+   - Algoritma pemecahan tile dengan overlap margin untuk mencegah artefak garis sambungan (*seam lines*).
+   - Cosine Hann window tile blending via C++ NDK engine.
+   - Progress bar dinamis (persentase dan nomor tile).
+4. **100% Offline & Privasi Mutlak**:
+   - Bebas pelacak dan tanpa memerlukan koneksi internet apa pun.
 
 ---
 
@@ -66,11 +70,11 @@ ArAr Shot v.1.0.3 menghadirkan **Antarmuka Interaktif Lengkap Peningkatan Foto**
 
 | Parameter | Spesifikasi |
 | :--- | :--- |
-| **Versi Aplikasi** | `1.0.3` (Version Code: `4`) |
+| **Versi Aplikasi** | `1.0.4` (Version Code: `5`) |
 | **Target SDK** | Android 14 (API Level 34) |
 | **Minimum SDK** | Android 7.0 Nougat (API Level 24) |
 | **Arsitektur CPU (ABI)** | `arm64-v8a` (64-bit modern), `armeabi-v7a` (32-bit legacy), `x86_64` |
-| **Ukuran APK Rilis** | **~33.4 MB** (Semua model AI dan native library sudah di dalam APK) |
+| **Ukuran APK Rilis** | **~33.5 MB** (Semua model AI dan native library sudah di dalam APK) |
 | **UI Framework** | Jetpack Compose + Material 3 Design |
 | **Build System** | Gradle 8.9 + AGP 8.6.1 + CMake 3.22.1 + NDK 25/26 |
 
@@ -78,6 +82,6 @@ ArAr Shot v.1.0.3 menghadirkan **Antarmuka Interaktif Lengkap Peningkatan Foto**
 
 ### 📲 Panduan Instalasi di Ponsel Android
 
-1. Unduh berkas **`ArAr-Shot-v.1.0.3.apk`** (atau `ArAr-Shot-v.1.0.3-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
-2. Buka/Pasang berkas `ArAr-Shot-v.1.0.3.apk` di ponsel Anda.
-3. Langsung pilih foto dari galeri atau foto kamera untuk memulai peningkatan kualitas foto dengan AI!
+1. Unduh berkas **`ArAr-Shot-v.1.0.4.apk`** (atau `ArAr-Shot-v.1.0.4-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
+2. Buka/Pasang berkas `ArAr-Shot-v.1.0.4.apk` di ponsel Anda.
+3. Nikmati seluruh fitur lengkap: Quick AI Enhance 4X, Pro Color Grading, Crop & Transform, dan Collage Studio Grid!
