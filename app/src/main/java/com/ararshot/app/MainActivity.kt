@@ -115,7 +115,7 @@ class MainActivity : AppCompatActivity() {
         } catch (t: Throwable) {
             Log.e("MainActivity", "Fatal error during setContent: ${t.message}", t)
             val fallbackView = android.widget.TextView(this).apply {
-                text = "ArAr Shot v.1.0.1 (Diagnostic Mode)\n\nCould not load Compose layout: ${t.localizedMessage ?: t.message}\n\nPlease check crash_log.txt in internal storage."
+                text = "ArAr Shot v.1.0.2 (Diagnostic Mode)\n\nCould not load Compose layout: ${t.localizedMessage ?: t.message}\n\nPlease check crash_log.txt in internal storage."
                 setPadding(48, 48, 48, 48)
                 textSize = 15f
                 setTextColor(android.graphics.Color.WHITE)
@@ -194,7 +194,7 @@ fun ArArShotApp(
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "ArAr Shot v.1.0.1",
+                text = "ArAr Shot v.1.0.2",
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary

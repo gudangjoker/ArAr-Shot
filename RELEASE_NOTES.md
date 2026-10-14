@@ -1,6 +1,6 @@
-# 📸 ArAr Shot v.1.0.1 — Release Notes
+# 📸 ArAr Shot v.1.0.2 — Release Notes
 
-## Versi 1.0.1 (ArAr Shot v.1.0.1 Personal Offline Release)
+## Versi 1.0.2 (ArAr Shot v.1.0.2 Personal Offline Release)
 **Tanggal Rilis**: 14 Oktober 2026  
 **Package Name**: `com.ararshot.app`  
 **Tipe Rilis**: Edisi Pribadi (Offline Standalone Build)  
@@ -9,7 +9,7 @@
 ---
 
 ### ✨ Ringkasan Rilis
-ArAr Shot v.1.0.1 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardware penuh untuk aplikasi peningkatan kualitas foto (*photo enhancer & super-resolution*) bertenaga AI lokal. Dilengkapi dengan logo kamera futuristik, inisialisasi engine lazy (bebas crash), dan penamaan file rilis langsung `ArAr-Shot-v.1.0.1.apk`.
+ArAr Shot v.1.0.2 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardware penuh untuk aplikasi peningkatan kualitas foto (*photo enhancer & super-resolution*) bertenaga AI lokal. Dilengkapi dengan logo kamera futuristik, inisialisasi engine lazy (bebas crash), penamaan file rilis langsung `ArAr-Shot-v.1.0.2.apk`, dan kenaikan version code (code: 3) untuk mencegah benturan cache instalasi Android.
 
 ---
 
@@ -56,11 +56,11 @@ ArAr Shot v.1.0.1 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardw
 
 | Parameter | Spesifikasi |
 | :--- | :--- |
-| **Versi Aplikasi** | `1.0.1` (Version Code: `2`) |
+| **Versi Aplikasi** | `1.0.2` (Version Code: `3`) |
 | **Target SDK** | Android 14 (API Level 34) |
 | **Minimum SDK** | Android 7.0 Nougat (API Level 24) |
 | **Arsitektur CPU (ABI)** | `arm64-v8a` (64-bit modern), `armeabi-v7a` (32-bit legacy), `x86_64` |
-| **Ukuran APK Rilis** | **~54.8 MB** (Semua model AI dan native library sudah di dalam APK) |
+| **Ukuran APK Rilis** | **~33.4 MB** (Semua model AI dan native library sudah di dalam APK) |
 | **UI Framework** | Jetpack Compose + Material 3 Design |
 | **Build System** | Gradle 8.9 + AGP 8.6.1 + CMake 3.22.1 + NDK 25/26 |
 
@@ -68,8 +68,8 @@ ArAr Shot v.1.0.1 adalah pembaruan perbaikan stabilitas dan kompatibilitas hardw
 
 ### 📲 Panduan Instalasi di Ponsel Android
 
-1. Unduh file **`ArAr-Shot-v.1.0.1.apk`** (atau `ArAr-Shot-v.1.0.1-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
+1. Unduh file **`ArAr-Shot-v.1.0.2.apk`** (atau `ArAr-Shot-v.1.0.2-release.apk`) langsung dari bagian **Assets** di halaman GitHub Releases ini.
 2. Pindahkan file `.apk` ke ponsel Android Anda (atau download langsung melalui browser ponsel).
-3. Buka/Tap file `ArAr-Shot-v.1.0.1.apk` di ponsel Anda untuk memulai proses pemasangan:
+3. Buka/Tap file `ArAr-Shot-v.1.0.2.apk` di ponsel Anda untuk memulai proses pemasangan:
    - Jika muncul peringatan *"Install unknown apps / Sumber tidak dikenal"*, pilih **Izinkan (Allow)**.
 4. Selesai! Aplikasi langsung dapat dibuka dan digunakan dengan logo kamera futuristik terbaru tanpa koneksi internet.
