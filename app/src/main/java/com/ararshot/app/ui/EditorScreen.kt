@@ -85,7 +85,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -102,6 +104,10 @@ import com.ararshot.app.engine.TextFontFamily
 import com.ararshot.app.engine.TextStyleModel
 import com.ararshot.app.engine.TextStyler
 import com.ararshot.app.ui.components.BeforeAfterSlider
+import com.ararshot.app.ui.components.GradientButton
+import com.ararshot.app.ui.components.ModernSlider
+import com.ararshot.app.ui.components.OptionRow
+import com.ararshot.app.ui.theme.ArArColors
 import com.ararshot.app.ui.components.InpaintBrushView
 import com.ararshot.app.viewmodel.ColorGradingState
 import com.ararshot.app.viewmodel.EditorTab
@@ -195,12 +201,12 @@ fun EditorScreen(
                 title = {
                     Column {
                         Text(
-                            text = "ArAr Studio Pro",
+                            text = "ArAr Studio",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "6-Model Offline SOTA Neural Engine",
+                            text = "Editor AI offline",
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -217,7 +223,7 @@ fun EditorScreen(
                         onClick = { viewModel.undo() },
                         enabled = canUndo
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Urungkan")
                     }
 
                     // Redo button
@@ -225,7 +231,7 @@ fun EditorScreen(
                         onClick = { viewModel.redo() },
                         enabled = canRedo
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Ulangi")
                     }
 
                     // Toggle Before/After comparison slider
@@ -249,7 +255,7 @@ fun EditorScreen(
                             contentPadding = ButtonDefaults.TextButtonContentPadding,
                             modifier = Modifier.padding(end = 4.dp)
                         ) {
-                            Text("Reset", fontSize = 11.sp)
+                            Text("Atur Ulang", fontSize = 11.sp)
                         }
                     }
 
@@ -269,10 +275,11 @@ fun EditorScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -284,7 +291,9 @@ fun EditorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1.05f)
-                    .background(Color(0xFF101014))
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(ArArColors.Ink)
                     .padding(8.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -365,126 +374,53 @@ fun EditorScreen(
                 }
             }
 
-            // HORIZONTAL SCROLLABLE TAB ROW (All 12 Studio Tools)
-            ScrollableTabRow(
-                selectedTabIndex = currentTab.ordinal,
-                modifier = Modifier.fillMaxWidth(),
-                edgePadding = 12.dp
-            ) {
-                Tab(
-                    selected = currentTab == EditorTab.AI_ENHANCE,
-                    onClick = { viewModel.setCurrentTab(EditorTab.AI_ENHANCE) },
-                    icon = { Icon(Icons.Default.FaceRetouchingNatural, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Remini & 4X", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.MAGIC_ERASER,
-                    onClick = { viewModel.setCurrentTab(EditorTab.MAGIC_ERASER) },
-                    icon = { Icon(Icons.Default.Healing, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Magic Eraser", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.DEPTH_BOKEH_3D,
-                    onClick = { viewModel.setCurrentTab(EditorTab.DEPTH_BOKEH_3D) },
-                    icon = { Icon(Icons.Default.CameraEnhance, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Bokeh & 3D", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.BG_REMOVE,
-                    onClick = { viewModel.setCurrentTab(EditorTab.BG_REMOVE) },
-                    icon = { Icon(Icons.Default.Layers, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("AI Cutout & BG", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.COLORIZE,
-                    onClick = { viewModel.setCurrentTab(EditorTab.COLORIZE) },
-                    icon = { Icon(Icons.Default.Gradient, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Colorize Jadul", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.ANIME_STYLE,
-                    onClick = { viewModel.setCurrentTab(EditorTab.ANIME_STYLE) },
-                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("AI Anime", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.PASSPORT_PHOTO,
-                    onClick = { viewModel.setCurrentTab(EditorTab.PASSPORT_PHOTO) },
-                    icon = { Icon(Icons.Default.ContactPage, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Pasfoto Resmi", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.VINTAGE_CCD,
-                    onClick = { viewModel.setCurrentTab(EditorTab.VINTAGE_CCD) },
-                    icon = { Icon(Icons.Default.FilterVintage, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Vintage CCD", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.TEXT_TYPOGRAPHY,
-                    onClick = { viewModel.setCurrentTab(EditorTab.TEXT_TYPOGRAPHY) },
-                    icon = { Icon(Icons.Default.Title, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Teks & Font", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.COLOR_GRADING,
-                    onClick = { viewModel.setCurrentTab(EditorTab.COLOR_GRADING) },
-                    icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Color Grade", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.CROP_TRANSFORM,
-                    onClick = { viewModel.setCurrentTab(EditorTab.CROP_TRANSFORM) },
-                    icon = { Icon(Icons.Default.CropRotate, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Transform", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = currentTab == EditorTab.EXPORT,
-                    onClick = { viewModel.setCurrentTab(EditorTab.EXPORT) },
-                    icon = { Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    text = { Text("Ekspor", fontSize = 11.sp) }
-                )
-            }
+            // TOOL CHIP BAR (all studio tools)
+            ToolChipBar(
+                current = currentTab,
+                onSelect = { viewModel.setCurrentTab(it) }
+            )
 
             // CONTROLS DRAWER
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(0.95f)
-                    .verticalScroll(controlScrollState)
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .padding(16.dp)
+                    .verticalScroll(controlScrollState)
+                    .padding(horizontal = 18.dp, vertical = 18.dp)
             ) {
                 when (currentTab) {
                     // TAB 1: REMINI FACE RESTORATION & AI 4X SUPER-RESOLUTION
                     EditorTab.AI_ENHANCE -> {
-                        Text("Mode Rekonstruksi Wajah & AI 4x", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Pilihan Restorasi Wajah & AI 4X", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         val modes = listOf(
                             Triple(
                                 ImageEnhancerNative.MODE_FACE_RESTORE,
-                                "👤 Remini Face & Portrait Restore",
-                                "SCRFD 5-Landmark + Neural Face SR + Rekonstruksi Mata & Pori Kulit"
+                                "👤 Restorasi Wajah & Potret",
+                                "Deteksi Titik Wajah + Rekonstruksi AI + Pemulihan Mata & Pori Kulit"
                             ),
                             Triple(
                                 ImageEnhancerNative.MODE_SUPER_RESOLUTION,
-                                "✨ 4x Super-Resolution Crisp",
-                                "Real-ESRGAN x4v3 NCNN Neural Upscaling"
+                                "✨ Resolusi Super 4X Tajam",
+                                "Peningkatan Resolusi Neural Real-ESRGAN x4v3"
                             ),
                             Triple(
                                 ImageEnhancerNative.MODE_COMBINED_ENHANCE,
-                                "🚀 Ultra Enhance + Denoise 4x",
-                                "Real-ESRGAN WDN-x4v3 + Bilateral Chroma Clean + Micro-Contrast"
+                                "🚀 Peningkatan Ekstra + Bebas Noise 4X",
+                                "Real-ESRGAN WDN 4X + Pembersihan Bintik Warna + Kontras Mikro"
                             ),
                             Triple(
                                 ImageEnhancerNative.MODE_UNSHARP_MASK,
-                                "🔍 Pertajam Detail (Luminance USM)",
-                                "Zero-Halo Adaptive Luminance Unsharp Mask"
+                                "🔍 Pertajam Detail Alami",
+                                "Penajaman Adaptif Pencahayaan Tanpa Efek Halo"
                             ),
                             Triple(
                                 ImageEnhancerNative.MODE_BILATERAL_DENOISE,
-                                "🧼 Bersihkan Noise (Edge-Preserving)",
-                                "Fast LUT Bilateral Chroma & Luminance Denoise"
+                                "🧼 Bersihkan Bintik & Noise",
+                                "Pembersih Bintik ISO & Warna dengan Menjaga Batas Objek"
                             )
                         )
 
@@ -518,7 +454,7 @@ fun EditorScreen(
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        SliderControl(label = "Kekuatan Rekonstruksi AI (Fidelity)", value = enhanceStrength, range = 0.3f..1.5f, displayFormat = "%.2fx") {
+                        SliderControl(label = "Tingkat Ketajaman Rekonstruksi AI", value = enhanceStrength, range = 0.3f..1.5f, displayFormat = "%.2fx") {
                             enhanceStrength = it
                         }
 
@@ -528,13 +464,13 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (selectedEnhanceMode == ImageEnhancerNative.MODE_FACE_RESTORE) {
-                                    "Jalankan Remini Face & Portrait Restore"
+                                    "Jalankan Restorasi Wajah & Potret"
                                 } else {
                                     "Jalankan Rekonstruksi AI Sekarang"
                                 },
@@ -545,15 +481,15 @@ fun EditorScreen(
 
                     // TAB 2: MAGIC ERASER / OBJECT REMOVAL
                     EditorTab.MAGIC_ERASER -> {
-                        Text("Magic Eraser (Hapus Objek Pengganggu)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Penghapus Objek AI", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text(
-                            "Usap objek, orang lewat, kabel, atau noda pada foto di atas (mendukung Eikonal Gradient + Patch Texture).",
+                            "Usap objek, orang lewat, kabel, atau noda pada foto di atas untuk menghapusnya secara mulus.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        SliderControl(label = "Ukuran Kuas (Brush Size)", value = brushRadius, range = 8f..70f, displayFormat = "%.0f px") {
+                        SliderControl(label = "Ukuran Kuas", value = brushRadius, range = 8f..70f, displayFormat = "%.0f px") {
                             brushRadius = it
                         }
 
@@ -572,7 +508,7 @@ fun EditorScreen(
                                 shape = RoundedCornerShape(8.dp),
                                 colors = if (isErasingBrush) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) else ButtonDefaults.outlinedButtonColors()
                             ) {
-                                Text("🧽 Hapus Kuas", fontSize = 11.sp)
+                                Text("🧽 Hapus Usapan", fontSize = 11.sp)
                             }
                             OutlinedButton(
                                 onClick = { viewModel.clearInpaintMask() },
@@ -589,21 +525,21 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("✨ Hapus Objek Sekarang (AI Magic Eraser)", fontWeight = FontWeight.Bold)
+                            Text("Hapus Objek Sekarang", fontWeight = FontWeight.Bold)
                         }
                     }
 
                     // TAB 3: AI DEPTH BOKEH & 3D RELIGHTING
                     EditorTab.DEPTH_BOKEH_3D -> {
-                        Text("AI Depth Anything 3D Bokeh & Relighting", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Efek Bokeh Kedalaman 3D & Pencahayaan Studio", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Text("📸 1. Optical Lens DSLR Bokeh (Depth Anything dpt256)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        SliderControl(label = "Kekuatan Blur Lensa (Aperture)", value = bokehBlurRadius, range = 4f..32f, displayFormat = "%.0f px") {
+                        Text("📸 1. Efek Blur Lensa DSLR", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        SliderControl(label = "Kekuatan Blur Lensa (Bukaan)", value = bokehBlurRadius, range = 4f..32f, displayFormat = "%.0f px") {
                             bokehBlurRadius = it
                         }
                         SliderControl(label = "Jarak Fokus Subjek", value = bokehFocusDepth, range = 0.1f..1.0f, displayFormat = "%.2f") {
@@ -623,14 +559,14 @@ fun EditorScreen(
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
-                        Text("💡 2. 3D Studio Relighting (Normal Map Wajah & Subjek)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text("💡 2. Pencahayaan Studio 3D (Relighting)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(6.dp))
 
                         val lightPresets = listOf(
-                            Pair("Cyber Cyan", android.graphics.Color.parseColor("#00E5FF")),
-                            Pair("Neon Pink", android.graphics.Color.parseColor("#FF1744")),
-                            Pair("Golden Hour", android.graphics.Color.parseColor("#FFB74D")),
-                            Pair("Studio Putih", android.graphics.Color.WHITE)
+                            Pair("Sian Siber", android.graphics.Color.parseColor("#00E5FF")),
+                            Pair("Merah Neon", android.graphics.Color.parseColor("#FF1744")),
+                            Pair("Senja Emas", android.graphics.Color.parseColor("#FFB74D")),
+                            Pair("Putih Studio", android.graphics.Color.WHITE)
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -681,18 +617,18 @@ fun EditorScreen(
 
                     // TAB 4: AI BACKGROUND REMOVER, SHADOW & CUTOUT
                     EditorTab.BG_REMOVE -> {
-                        Text("MODNet Hair Alpha Matting, Shadow & Cutout", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Hapus Latar Belakang AI, Bayangan & Stiker", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         val bgModes = listOf(
-                            Pair(BgReplaceMode.TRANSPARENT, "✂️ Hapus BG (PNG Transparan Lossless)"),
-                            Pair(BgReplaceMode.STUDIO_SHADOW, "📦 3D Product Drop Shadow"),
-                            Pair(BgReplaceMode.STICKER_OUTLINE, "🏷️ Stiker Outline Putih (Exact EDT)"),
-                            Pair(BgReplaceMode.COLOR_SPLASH, "🎨 Splash Color (Latar B&W)"),
-                            Pair(BgReplaceMode.SOLID_COLOR, "🎨 Warna Studio Solid"),
-                            Pair(BgReplaceMode.GRADIENT_STUDIO, "🌈 Gradien Studio Lighting"),
-                            Pair(BgReplaceMode.BLUR_ORIGINAL, "📸 DSLR Bokeh Blur"),
-                            Pair(BgReplaceMode.CUSTOM_IMAGE, "🖼️ Ganti Foto dari Galeri")
+                            Pair(BgReplaceMode.TRANSPARENT, "✂️ Hapus Latar (PNG Transparan)"),
+                            Pair(BgReplaceMode.STUDIO_SHADOW, "📦 Bayangan Produk 3D (Drop Shadow)"),
+                            Pair(BgReplaceMode.STICKER_OUTLINE, "🏷️ Stiker Garis Tepi Putih (Outline)"),
+                            Pair(BgReplaceMode.COLOR_SPLASH, "🎨 Warna Subjek (Latar Hitam-Putih)"),
+                            Pair(BgReplaceMode.SOLID_COLOR, "🎨 Warna Studio Polos"),
+                            Pair(BgReplaceMode.GRADIENT_STUDIO, "🌈 Gradasi Cahaya Studio"),
+                            Pair(BgReplaceMode.BLUR_ORIGINAL, "📸 Latar Blur Ala DSLR"),
+                            Pair(BgReplaceMode.CUSTOM_IMAGE, "🖼️ Ganti Latar dari Galeri")
                         )
 
                         bgModes.forEach { (mode, label) ->
@@ -771,7 +707,7 @@ fun EditorScreen(
                         }
 
                         if (bgMode == BgReplaceMode.STICKER_OUTLINE) {
-                            SliderControl(label = "Ketebalan Outline Stiker", value = stickerOutlineWidth, range = 4f..26f, displayFormat = "%.0f px") {
+                            SliderControl(label = "Ketebalan Garis Tepi Stiker", value = stickerOutlineWidth, range = 4f..26f, displayFormat = "%.0f px") {
                                 stickerOutlineWidth = it
                             }
                         }
@@ -793,29 +729,29 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(46.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.ContentCut, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("✨ Eksekusi Ganti / Hapus Latar", fontWeight = FontWeight.Bold)
+                            Text("Terapkan Ganti / Hapus Latar", fontWeight = FontWeight.Bold)
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("🌟 Fitur Populer: Teks di Belakang Subjek", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Text("Menyelipkan tulisan keren tepat di belakang badan orang/produk ala sampul majalah.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("🌟 Fitur Khusus: Tulisan di Belakang Subjek", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Menempatkan tulisan tipografi tepat di belakang badan orang atau produk ala sampul majalah.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = { viewModel.runTextBehindSubject() },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("Pasang Teks di Belakang Orang", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Pasang Tulisan di Belakang Subjek", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -823,15 +759,15 @@ fun EditorScreen(
 
                     // TAB 5: COLORIZE OLD B&W PHOTOS
                     EditorTab.COLORIZE -> {
-                        Text("Colorize Old B&W Photos (CIE LAB Perceptual)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Pewarnaan Foto Hitam-Putih Lawas", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text(
-                            "Rekonstruksi krominansi CIE LAB untuk wajah/kulit manusia, dedaunan hijau, dan langit biru tanpa mengubah ketajaman luminansi asli.",
+                            "Pewarnaan alami untuk wajah manusia, warna kulit, dedaunan hijau, dan langit biru pada foto kenangan lawas.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        SliderControl(label = "Kehangatan Nada Kulit (Skin Tone Warmth)", value = skinWarmth, range = 0.4f..1.6f, displayFormat = "%.2fx") {
+                        SliderControl(label = "Kehangatan Warna Kulit", value = skinWarmth, range = 0.4f..1.6f, displayFormat = "%.2fx") {
                             skinWarmth = it
                         }
                         SliderControl(label = "Saturasi Langit & Alam Hijau", value = skyCyan, range = 0.4f..1.6f, displayFormat = "%.2fx") {
@@ -844,7 +780,7 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.ColorLens, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -854,21 +790,21 @@ fun EditorScreen(
 
                     // TAB 6: AI ANIME / CEL-SHADING STYLE
                     EditorTab.ANIME_STYLE -> {
-                        Text("AnimeGANv2 NCNN & Cel-Shading Style Transfer", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Gaya Anime & Ilustrasi Artistik", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text(
-                            "Model neural AnimeGANv2 (face_paint_512_v2) + Kuwahara Anisotropik + kontur tinta halus Makoto Shinkai & Studio Ghibli.",
+                            "Transformasi potret menjadi ilustrasi anime artistik dengan sapuan kuas halus dan kontur tinta yang tegas.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        SliderControl(label = "Kehalusan Cel-Shading Kuwahara", value = animeRadius.toFloat(), range = 2f..7f, displayFormat = "%.0f") {
+                        SliderControl(label = "Kehalusan Sapuan Kuas Anime", value = animeRadius.toFloat(), range = 2f..7f, displayFormat = "%.0f") {
                             animeRadius = it.toInt()
                         }
-                        SliderControl(label = "Ketegasan Garis Tinta (Ink Outlines)", value = animeEdgeStrength, range = 0.2f..1.2f, displayFormat = "%.2f") {
+                        SliderControl(label = "Ketegasan Garis Tinta", value = animeEdgeStrength, range = 0.2f..1.2f, displayFormat = "%.2f") {
                             animeEdgeStrength = it
                         }
-                        SliderControl(label = "Vibransi Warna Studio Ghibli", value = animeVibrancy, range = 0.4f..1.8f, displayFormat = "%.2fx") {
+                        SliderControl(label = "Kecerahan Warna Anime", value = animeVibrancy, range = 0.4f..1.8f, displayFormat = "%.2fx") {
                             animeVibrancy = it
                         }
 
@@ -878,19 +814,19 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.Face, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("🌸 Terapkan Gaya AI Anime / Ghibli", fontWeight = FontWeight.Bold)
+                            Text("🌸 Terapkan Gaya Anime Sekarang", fontWeight = FontWeight.Bold)
                         }
                     }
 
                     // TAB 7: AI PASSPORT / ID PHOTO MAKER & 4R SHEET
                     EditorTab.PASSPORT_PHOTO -> {
-                        Text("AI Pasfoto Resmi (SCRFD Biometric Auto-Center)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Pasfoto Resmi (Penataan Wajah Otomatis)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text(
-                            "Deteksi titik mata otomatis SCRFD, ganti latar belakang standar resmi, dan susun ke kertas cetak 4R 300 DPI.",
+                            "Deteksi posisi wajah otomatis, penggantian warna latar standar, serta susunan lembar cetak 4R rapi.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -978,31 +914,31 @@ fun EditorScreen(
 
                     // TAB 8: VINTAGE CCD & RED HALATION
                     EditorTab.VINTAGE_CCD -> {
-                        Text("Vintage CCD Digicam & CineStill 800T Halation", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Kamera Lawas CCD & Pendaran Lampu Film", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text(
-                            "Tren kamera saku 2000-an: pendaran merah-oranye lembut pada highlight lampu malam, silver-halide grain, & cap tanggal LCD.",
+                            "Nuansa kamera saku analog 2000-an: pendaran cahaya hangat, bintik film analog, dan stempel tanggal khas.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        SliderControl(label = "Red Halation (Pendaran Merah Lampu)", value = halationRadius, range = 4f..24f, displayFormat = "%.0f px") {
+                        SliderControl(label = "Pendaran Cahaya Hangat (Halation)", value = halationRadius, range = 4f..24f, displayFormat = "%.0f px") {
                             halationRadius = it
                         }
-                        SliderControl(label = "Film Grain Analog", value = filmGrainStrength, range = 0.0f..1.0f, displayFormat = "%.2f") {
+                        SliderControl(label = "Bintik Film Analog (Grain)", value = filmGrainStrength, range = 0.0f..1.0f, displayFormat = "%.2f") {
                             filmGrainStrength = it
                         }
-                        SliderControl(label = "Vignette Optik Lensa", value = chromaticShift, range = 0.0f..1.0f, displayFormat = "%.2f") {
+                        SliderControl(label = "Vinyet Lensa", value = chromaticShift, range = 0.0f..1.0f, displayFormat = "%.2f") {
                             chromaticShift = it
                         }
-                        SliderControl(label = "Kehangatan Tone CCD", value = vintageWarmth, range = 0.5f..1.6f, displayFormat = "%.2fx") {
+                        SliderControl(label = "Kehangatan Warna Kamera Lawas", value = vintageWarmth, range = 0.5f..1.6f, displayFormat = "%.2fx") {
                             vintageWarmth = it
                         }
 
                         OutlinedTextField(
                             value = dateStampText,
                             onValueChange = { dateStampText = it },
-                            label = { Text("Cap Tanggal LCD Oranye (Kamera 90-an)") },
+                            label = { Text("Cap Tanggal Kamera (Contoh: '98 10 14)") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -1021,29 +957,29 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("📸 Terapkan Filter Vintage CCD & Halation", fontWeight = FontWeight.Bold)
+                            Text("📸 Terapkan Efek Kamera Lawas", fontWeight = FontWeight.Bold)
                         }
                     }
 
                     // TAB 9: TEXT & TYPOGRAPHY STYLER
                     EditorTab.TEXT_TYPOGRAPHY -> {
-                        Text("Studio Teks & Tipografi (Live Preview)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Studio Teks & Tipografi", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         OutlinedTextField(
                             value = textConfig.text,
                             onValueChange = { viewModel.updateTextOverlay(textConfig.copy(text = it)) },
-                            label = { Text("Isi Teks") },
+                            label = { Text("Tuliskan Teks") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Pilih Model Gaya Teks:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Pilih Gaya Tampilan:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(6.dp))
 
                         val textModels = TextStyleModel.values()
@@ -1072,7 +1008,7 @@ fun EditorScreen(
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Pilih Jenis Font:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Pilih Jenis Huruf:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(6.dp))
 
                         val fonts = TextFontFamily.values()
@@ -1101,7 +1037,7 @@ fun EditorScreen(
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        SliderControl(label = "Ukuran Teks (Font Size)", value = textConfig.fontSizeSp, range = 18f..72f, displayFormat = "%.0f sp") {
+                        SliderControl(label = "Ukuran Huruf", value = textConfig.fontSizeSp, range = 18f..72f, displayFormat = "%.0f sp") {
                             viewModel.updateTextOverlay(textConfig.copy(fontSizeSp = it))
                         }
 
@@ -1113,7 +1049,7 @@ fun EditorScreen(
                             viewModel.updateTextOverlay(textConfig.copy(positionYFraction = it))
                         }
 
-                        SliderControl(label = "Rotasi Teks (Derajat)", value = textConfig.rotationDegrees, range = -45f..45f, displayFormat = "%.0f°") {
+                        SliderControl(label = "Kemiringan Rotasi (Derajat)", value = textConfig.rotationDegrees, range = -45f..45f, displayFormat = "%.0f°") {
                             viewModel.updateTextOverlay(textConfig.copy(rotationDegrees = it))
                         }
 
@@ -1123,48 +1059,48 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("✍️ Terapkan Teks Permanen ke Foto", fontWeight = FontWeight.Bold)
+                            Text("✍️ Terapkan Tulisan ke Foto", fontWeight = FontWeight.Bold)
                         }
                     }
 
                     // TAB 10: COLOR GRADING
                     EditorTab.COLOR_GRADING -> {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("Color Grading Real-Time", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Koreksi Warna Waktu Nyata", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             OutlinedButton(
                                 onClick = { viewModel.updateColorGrading(ColorGradingState()) },
                                 contentPadding = ButtonDefaults.TextButtonContentPadding,
                                 modifier = Modifier.height(30.dp)
                             ) {
-                                Text("Reset", fontSize = 11.sp)
+                                Text("Atur Ulang", fontSize = 11.sp)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        SliderControl(label = "Exposure", value = colorState.exposure, range = -60f..60f, displayFormat = "%.0f") {
+                        SliderControl(label = "Pencahayaan (Exposure)", value = colorState.exposure, range = -60f..60f, displayFormat = "%.0f") {
                             viewModel.updateColorGrading(colorState.copy(exposure = it))
                         }
-                        SliderControl(label = "Contrast", value = colorState.contrast, range = 0.5f..2.0f, displayFormat = "%.2fx") {
+                        SliderControl(label = "Kontras", value = colorState.contrast, range = 0.5f..2.0f, displayFormat = "%.2fx") {
                             viewModel.updateColorGrading(colorState.copy(contrast = it))
                         }
-                        SliderControl(label = "Saturation", value = colorState.saturation, range = 0.0f..2.0f, displayFormat = "%.2fx") {
+                        SliderControl(label = "Saturasi Warna", value = colorState.saturation, range = 0.0f..2.0f, displayFormat = "%.2fx") {
                             viewModel.updateColorGrading(colorState.copy(saturation = it))
                         }
-                        SliderControl(label = "Temperature", value = colorState.temperature, range = -40f..40f, displayFormat = "%.0f") {
+                        SliderControl(label = "Suhu Warna (Temperature)", value = colorState.temperature, range = -40f..40f, displayFormat = "%.0f") {
                             viewModel.updateColorGrading(colorState.copy(temperature = it))
                         }
-                        SliderControl(label = "Vignette", value = colorState.vignette, range = 0.0f..1.0f, displayFormat = "%.2f") {
+                        SliderControl(label = "Vinyet Lensa", value = colorState.vignette, range = 0.0f..1.0f, displayFormat = "%.2f") {
                             viewModel.updateColorGrading(colorState.copy(vignette = it))
                         }
                     }
 
                     // TAB 11: CROP & TRANSFORM
                     EditorTab.CROP_TRANSFORM -> {
-                        Text("Transform & Crop Studio", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Potong & Atur Posisi Foto", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1176,29 +1112,29 @@ fun EditorScreen(
                             OutlinedButton(onClick = { viewModel.flipHorizontal() }, modifier = Modifier.weight(1f)) {
                                 Icon(Icons.Default.Flip, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Flip Horisontal", fontSize = 12.sp)
+                                Text("Balik Horisontal", fontSize = 12.sp)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
-                        Text("Potong Rasio Aspek (Aspect Ratio):", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text("Pilihan Rasio Pemotongan:", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { viewModel.cropAspect(1, 1) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
-                                Text("1:1 (Square)", fontSize = 11.sp)
+                                Text("1:1 (Persegi)", fontSize = 11.sp)
                             }
                             Button(onClick = { viewModel.cropAspect(4, 5) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
-                                Text("4:5 (IG)", fontSize = 11.sp)
+                                Text("4:5 (Potret/IG)", fontSize = 11.sp)
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { viewModel.cropAspect(16, 9) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
-                                Text("16:9 (Landscape)", fontSize = 11.sp)
+                                Text("16:9 (Lanskap)", fontSize = 11.sp)
                             }
                             Button(onClick = { viewModel.cropAspect(9, 16) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
-                                Text("9:16 (Story)", fontSize = 11.sp)
+                                Text("9:16 (Cerita/Reels)", fontSize = 11.sp)
                             }
                         }
                     }
@@ -1208,7 +1144,7 @@ fun EditorScreen(
                         val isTransparentPng = remember(workingBitmap) {
                             workingBitmap?.let { ImageUtils.hasTransparency(it) } ?: false
                         }
-                        Text("Ekspor & Simpan ke Galeri", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Simpan & Ekspor ke Galeri", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Card(
@@ -1218,17 +1154,17 @@ fun EditorScreen(
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text("Spesifikasi Foto Hasil:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("• Dimensi: ${workingBitmap?.width ?: 0} × ${workingBitmap?.height ?: 0} px", fontSize = 12.sp)
+                                Text("• Dimensi: ${workingBitmap?.width ?: 0} × ${workingBitmap?.height ?: 0} piksel", fontSize = 12.sp)
                                 Text(
                                     text = if (isTransparentPng) {
-                                        "• Format: PNG Lossless Transparan (32-bit RGBA)"
+                                        "• Format: PNG Transparan Berkualitas Tinggi (32-bit RGBA)"
                                     } else {
-                                        "• Format: JPEG Kualitas Ultra (98% Quality)"
+                                        "• Format: JPEG Kualitas Ultra (98%)"
                                     },
                                     fontSize = 12.sp
                                 )
-                                Text("• Lokasi: Pictures/ArArShot", fontSize = 12.sp)
-                                Text("• Engine: 100% Offline C++17 OpenMP & 6-Model NCNN", fontSize = 12.sp)
+                                Text("• Lokasi Penyimpanan: Pictures/ArArShot", fontSize = 12.sp)
+                                Text("• Mesin Pemrosesan: 100% Offline C++17 OpenMP & NCNN AI", fontSize = 12.sp)
                             }
                         }
 
@@ -1247,7 +1183,7 @@ fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -1271,19 +1207,72 @@ fun SliderControl(
     displayFormat: String,
     onValueChange: (Float) -> Unit
 ) {
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(label, fontSize = 12.sp)
-            Text(String.format(displayFormat, value), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    ModernSlider(
+        label = label,
+        value = value,
+        range = range,
+        displayFormat = displayFormat,
+        onValueChange = onValueChange
+    )
+}
+
+private data class EditorToolChip(val tab: EditorTab, val label: String, val icon: ImageVector)
+
+private val editorToolChips = listOf(
+    EditorToolChip(EditorTab.AI_ENHANCE, "Restorasi & 4X", Icons.Default.FaceRetouchingNatural),
+    EditorToolChip(EditorTab.MAGIC_ERASER, "Hapus Objek", Icons.Default.Healing),
+    EditorToolChip(EditorTab.DEPTH_BOKEH_3D, "Bokeh & 3D", Icons.Default.CameraEnhance),
+    EditorToolChip(EditorTab.BG_REMOVE, "Hapus Latar", Icons.Default.Layers),
+    EditorToolChip(EditorTab.COLORIZE, "Pewarnaan Lawas", Icons.Default.Gradient),
+    EditorToolChip(EditorTab.ANIME_STYLE, "Gaya Anime", Icons.Default.AutoAwesome),
+    EditorToolChip(EditorTab.PASSPORT_PHOTO, "Pasfoto Resmi", Icons.Default.ContactPage),
+    EditorToolChip(EditorTab.VINTAGE_CCD, "Kamera Lawas", Icons.Default.FilterVintage),
+    EditorToolChip(EditorTab.TEXT_TYPOGRAPHY, "Teks & Font", Icons.Default.Title),
+    EditorToolChip(EditorTab.COLOR_GRADING, "Koreksi Warna", Icons.Default.Tune),
+    EditorToolChip(EditorTab.CROP_TRANSFORM, "Potong & Putar", Icons.Default.CropRotate),
+    EditorToolChip(EditorTab.EXPORT, "Simpan & Ekspor", Icons.Default.Download)
+)
+
+@Composable
+private fun ToolChipBar(current: EditorTab, onSelect: (EditorTab) -> Unit) {
+    val scroll = rememberScrollState()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scroll)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        editorToolChips.forEach { chip ->
+            val selected = chip.tab == current
+            val shape = RoundedCornerShape(50)
+            Row(
+                modifier = Modifier
+                    .clip(shape)
+                    .then(
+                        if (selected) Modifier.background(ArArColors.SignatureGradient)
+                        else Modifier
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+                    )
+                    .clickable { onSelect(chip.tab) }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = chip.icon,
+                    contentDescription = null,
+                    tint = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    text = chip.label,
+                    fontSize = 12.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = range,
-            modifier = Modifier.height(30.dp)
-        )
     }
 }

@@ -934,26 +934,80 @@ void extractAlphaMatteInternal(const uint32_t* src, const float* coarseMask, flo
             rgbIn[i * 3 + 2] = p & 0xFF;
         }
 
-        ncnn::Mat inResize = ncnn::Mat::from_pixels_resize(rgbIn.data(), ncnn::Mat::PIXEL_RGB, width, height, 512, 512);
+        // Maintain strict aspect ratio via Letterbox Padding to 512x512
+        // Prevents non-square portraits from squashing and misaligning edges with coarseMask
+        const int targetSize = 512;
+        int w = width;
+        int h = height;
+        float scale = 1.0f;
+        if (w > h) {
+            scale = static_cast<float>(targetSize) / w;
+            w = targetSize;
+            h = std::max(1, static_cast<int>(h * scale));
+        } else {
+            scale = static_cast<float>(targetSize) / h;
+            h = targetSize;
+            w = std::max(1, static_cast<int>(w * scale));
+        }
+
+        ncnn::Mat inResized = ncnn::Mat::from_pixels_resize(rgbIn.data(), ncnn::Mat::PIXEL_RGB, width, height, w, h);
+        int wpad = targetSize - w;
+        int hpad = targetSize - h;
+        int padTop = hpad / 2;
+        int padBottom = hpad - padTop;
+        int padLeft = wpad / 2;
+        int padRight = wpad - padLeft;
+
+        ncnn::Mat inPad;
+        ncnn::copy_make_border(inResized, inPad, padTop, padBottom, padLeft, padRight, ncnn::BORDER_CONSTANT, 127.5f);
+
         const float meanVals[3] = {127.5f, 127.5f, 127.5f};
         const float normVals[3] = {0.0078431f, 0.0078431f, 0.0078431f};
-        inResize.substract_mean_normalize(meanVals, normVals);
+        inPad.substract_mean_normalize(meanVals, normVals);
 
         ncnn::Extractor ex = g_matting_net->create_extractor();
-        ex.input("input", inResize);
+        ex.input("input", inPad);
         ncnn::Mat outMat;
-        if (ex.extract("output", outMat) == 0 && outMat.w > 0 && outMat.h > 0) {
+        if (ex.extract("output", outMat) == 0 && outMat.w >= targetSize && outMat.h >= targetSize) {
+            // Unpad: crop out the original aspect ratio region (w x h)
+            ncnn::Mat cropped(w, h, 1);
+            for (int y = 0; y < h; ++y) {
+                const float* srcRow = outMat.row(padTop + y) + padLeft;
+                float* dstRow = cropped.row(y);
+                std::memcpy(dstRow, srcRow, w * sizeof(float));
+            }
+
             ncnn::Mat alphaFull;
-            ncnn::resize_bilinear(outMat, alphaFull, width, height);
+            ncnn::resize_bilinear(cropped, alphaFull, width, height);
             const float* ptr = static_cast<const float*>(alphaFull.data);
+
+            // Adaptive Union Fusion:
+            // Protect body and clothing detected by ML Kit coarseMask from being suppressed
+            // while preserving fine hair flyaways from MODNet
             for (int i = 0; i < total; ++i) {
                 float mVal = std::clamp(ptr[i], 0.0f, 1.0f);
-                if (coarseMask) {
-                    // Fuse MODNet fine hair matte with ML Kit subject confidence
-                    rawAlpha[i] = std::clamp(0.65f * mVal + 0.35f * coarseMask[i], 0.0f, 1.0f);
+                float cVal = coarseMask ? std::clamp(coarseMask[i], 0.0f, 1.0f) : 0.0f;
+                float fused;
+
+                if (cVal >= 0.38f) {
+                    // Confident subject body/clothes/face: coarseMask is guaranteed foreground anchor,
+                    // MODNet details enhance sub-pixel boundary
+                    fused = std::max(cVal, mVal);
+                } else if (cVal >= 0.15f) {
+                    // Boundary transition zone: soft blend favoring maximum confidence
+                    fused = std::max(cVal, 0.40f * cVal + 0.60f * mVal);
                 } else {
-                    rawAlpha[i] = mVal;
+                    // Outside ML Kit coarse mask: allow MODNet fine hair strands if confident,
+                    // suppress background noise
+                    if (mVal > 0.45f) {
+                        fused = mVal;
+                    } else if (mVal > 0.15f) {
+                        fused = 0.65f * mVal + 0.35f * cVal;
+                    } else {
+                        fused = std::max(cVal, mVal * 0.35f);
+                    }
                 }
+                rawAlpha[i] = std::clamp(fused, 0.0f, 1.0f);
             }
             modnetSuccess = true;
         }
@@ -979,7 +1033,16 @@ void extractAlphaMatteInternal(const uint32_t* src, const float* coarseMask, flo
         guideLum[i] = (0.299f * r + 0.587f * g + 0.114f * b) / 255.0f;
     }
 
-    guidedFilter1Ch(guideLum.data(), rawAlpha.data(), outAlpha, width, height, 6, 1e-4f);
+    guidedFilter1Ch(guideLum.data(), rawAlpha.data(), outAlpha, width, height, 4, 5e-3f);
+
+    // Safeguard confident clothing and torso core from guided filter luminance attenuation
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < total; ++i) {
+        if (rawAlpha[i] > 0.55f) {
+            outAlpha[i] = std::max(outAlpha[i], rawAlpha[i] * 0.92f);
+        }
+        outAlpha[i] = std::clamp(outAlpha[i], 0.0f, 1.0f);
+    }
 }
 
 // ---------------------------------------------------------------------------

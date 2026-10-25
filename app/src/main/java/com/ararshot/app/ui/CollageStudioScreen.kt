@@ -65,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ararshot.app.ui.theme.ArArColors
 import com.ararshot.app.engine.ImageUtils
 import com.ararshot.app.viewmodel.EnhancerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -103,7 +104,7 @@ fun CollageStudioScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Collage Studio", fontWeight = FontWeight.Bold) },
+                title = { Text("Studio Kolase", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
@@ -112,15 +113,16 @@ fun CollageStudioScreen(
                 actions = {
                     if (collagePhotos.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearCollage() }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Reset")
+                            Icon(Icons.Default.Clear, contentDescription = "Atur Ulang")
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -135,8 +137,8 @@ fun CollageStudioScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF1E1E1E))
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(ArArColors.Ink)
                     .padding(spacingDp.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -191,7 +193,7 @@ fun CollageStudioScreen(
                 if (collagePhotos.size < 4) {
                     Button(
                         onClick = { pickPhotoLauncher.launch("image/*") },
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -253,7 +255,7 @@ fun CollageStudioScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Jarak Antarfoto (Margin):", fontSize = 12.sp)
+                        Text("Jarak Antarfoto:", fontSize = 12.sp)
                         Text("${spacingDp.toInt()} dp", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Slider(value = spacingDp, onValueChange = { spacingDp = it }, valueRange = 0f..24f)
@@ -261,7 +263,7 @@ fun CollageStudioScreen(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Kelengkungan Sudut (Corner):", fontSize = 12.sp)
+                        Text("Kelengkungan Sudut:", fontSize = 12.sp)
                         Text("${cornerRadiusDp.toInt()} dp", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Slider(value = cornerRadiusDp, onValueChange = { cornerRadiusDp = it }, valueRange = 0f..24f)

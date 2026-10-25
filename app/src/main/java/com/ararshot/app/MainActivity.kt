@@ -20,6 +20,7 @@ import com.ararshot.app.engine.ImageEnhancerNative
 import com.ararshot.app.ui.CollageStudioScreen
 import com.ararshot.app.ui.EditorScreen
 import com.ararshot.app.ui.HomeScreen
+import com.ararshot.app.ui.theme.ArArShotTheme
 import com.ararshot.app.viewmodel.EnhancerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -80,7 +81,7 @@ class MainActivity : AppCompatActivity() {
 
         try {
             setContent {
-                MaterialTheme {
+                ArArShotTheme {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background

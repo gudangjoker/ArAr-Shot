@@ -21,14 +21,14 @@ import kotlin.math.max
 import kotlin.math.min
 
 enum class BgReplaceMode(val displayName: String) {
-    TRANSPARENT("Hapus Background (PNG Transparan)"),
-    SOLID_COLOR("Warna Studio Solid"),
-    GRADIENT_STUDIO("Gradien Lighting Studio"),
-    BLUR_ORIGINAL("DSLR Bokeh Blur"),
+    TRANSPARENT("Hapus Latar Belakang (PNG Transparan)"),
+    SOLID_COLOR("Warna Studio Polos"),
+    GRADIENT_STUDIO("Gradasi Cahaya Studio"),
+    BLUR_ORIGINAL("Latar Blur Ala DSLR"),
     CUSTOM_IMAGE("Ganti Foto dari Galeri"),
-    STUDIO_SHADOW("3D Studio Product Drop Shadow"),
-    STICKER_OUTLINE("Stiker Outline Putih (Photoroom Style)"),
-    COLOR_SPLASH("Splash Color (BG Hitam-Putih)"),
+    STUDIO_SHADOW("Bayangan Produk 3D (Drop Shadow)"),
+    STICKER_OUTLINE("Garis Tepi Stiker Putih (Outline)"),
+    COLOR_SPLASH("Warna Subjek (Latar Hitam-Putih)"),
     PASSPORT_RED("Pasfoto Merah Resmi (#DB1514)"),
     PASSPORT_BLUE("Pasfoto Biru Resmi (#0054A6)")
 }
@@ -221,8 +221,11 @@ object BackgroundRemover {
             BgReplaceMode.STICKER_OUTLINE -> null
         }
 
-        val threshold = config.edgeThreshold.coerceIn(0.15f, 0.85f)
-        val band = 0.28f
+        val threshold = config.edgeThreshold.coerceIn(0.20f, 0.80f)
+        val transWidth = 0.15f
+        val edge0 = (threshold - transWidth).coerceAtLeast(0.02f)
+        val edge1 = (threshold + transWidth).coerceAtMost(0.98f)
+        val invSpan = 1.0f / (edge1 - edge0)
 
         for (y in 0 until height) {
             for (x in 0 until width) {
@@ -234,11 +237,8 @@ object BackgroundRemover {
                 var fgG = (origPixel ushr 8) and 0xFF
                 var fgB = origPixel and 0xFF
 
-                val alphaFactor = when {
-                    confidence >= threshold + band -> 1.0f
-                    confidence <= threshold - band -> 0.0f
-                    else -> ((confidence - (threshold - band)) / (2.0f * band)).coerceIn(0.0f, 1.0f)
-                }
+                val t = ((confidence - edge0) * invSpan).coerceIn(0.0f, 1.0f)
+                val alphaFactor = t * t * (3.0f - 2.0f * t)
 
                 // Foreground Color Decontamination on semi-transparent hair/boundary pixels
                 if (alphaFactor in 0.05f..0.92f) {
@@ -318,11 +318,8 @@ object BackgroundRemover {
 
         for (i in 0 until total) {
             val conf = mask[i]
-            val alphaFactor = when {
-                conf >= 0.65f -> 1.0f
-                conf <= 0.35f -> 0.0f
-                else -> (conf - 0.35f) / 0.30f
-            }
+            val t = ((conf - 0.35f) / 0.30f).coerceIn(0.0f, 1.0f)
+            val alphaFactor = t * t * (3.0f - 2.0f * t)
 
             if (alphaFactor >= 0.99f) {
                 outPixels[i] = origPixels[i]

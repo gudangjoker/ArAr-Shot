@@ -9,19 +9,19 @@ import android.graphics.RectF
 import android.graphics.Typeface
 
 enum class TextFontFamily(val displayName: String, val typeface: Typeface) {
-    SANS_SERIF("Modern Sans", Typeface.SANS_SERIF),
-    SERIF("Luxury Serif", Typeface.SERIF),
-    MONOSPACE("Cyber Mono", Typeface.MONOSPACE),
-    BOLD_IMPACT("Heavy Impact", Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)),
-    CURSIVE("Calligraphy Script", Typeface.create("cursive", Typeface.BOLD_ITALIC))
+    SANS_SERIF("Sans Modern", Typeface.SANS_SERIF),
+    SERIF("Serif Klasik", Typeface.SERIF),
+    MONOSPACE("Monospace Tebal", Typeface.MONOSPACE),
+    BOLD_IMPACT("Tebal Tegas (Impact)", Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)),
+    CURSIVE("Kaligrafi Elegan", Typeface.create("cursive", Typeface.BOLD_ITALIC))
 }
 
 enum class TextStyleModel(val displayName: String) {
-    CLEAN("Minimalist Clean"),
-    SHADOW_3D("3D Shadow Depth"),
-    NEON_GLOW("Cyberpunk Neon Glow"),
-    OUTLINE_STROKE("Bold Sticker Outline"),
-    BADGE_PILL("Instagram Badge Box")
+    CLEAN("Bersih Minimalis"),
+    SHADOW_3D("Bayangan 3D Dalam"),
+    NEON_GLOW("Kilau Neon Menyala"),
+    OUTLINE_STROKE("Garis Tepi Stiker"),
+    BADGE_PILL("Kotak Lencana (Badge)")
 }
 
 data class TextOverlayConfig(
