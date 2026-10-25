@@ -1,4 +1,4 @@
-name: Build ArAr Shot Pro v2.0.0 (Release APK)
+name: Build ArAr Shot Release APK
 
 on:
   push:
@@ -72,8 +72,8 @@ jobs:
           # Copy release APK
           for f in app/build/outputs/apk/release/*.apk; do
             if [ -f "$f" ]; then
-              cp -v "$f" "release_assets/ArAr-Shot-v.2.0.0.apk"
-              cp -v "$f" "release_assets/ArAr-Shot-v.2.0.0-release.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v2.0.1.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v2.0.1-release.apk"
               break
             fi
           done
@@ -81,13 +81,13 @@ jobs:
           # Copy debug APK
           for f in app/build/outputs/apk/debug/*.apk; do
             if [ -f "$f" ]; then
-              cp -v "$f" "release_assets/ArAr-Shot-v.2.0.0-debug.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v2.0.1-debug.apk"
               break
             fi
           done
 
-          if [ ! -f "release_assets/ArAr-Shot-v.2.0.0.apk" ]; then
-            echo "ERROR: release_assets/ArAr-Shot-v.2.0.0.apk not found!"
+          if [ ! -f "release_assets/ArAr-Shot-v2.0.1.apk" ]; then
+            echo "ERROR: release_assets/ArAr-Shot-v2.0.1.apk not found!"
             exit 1
           fi
 
@@ -96,23 +96,23 @@ jobs:
       - name: Upload Signed Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v2.0.0-Release-APK
-          path: release_assets/ArAr-Shot-v.2.0.0*.apk
+          name: ArArShot-v2.0.1-Release-APK
+          path: release_assets/ArAr-Shot-v2.0.1*.apk
           if-no-files-found: error
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v2.0.0-Debug-APK
-          path: release_assets/ArAr-Shot-v.2.0.0-debug.apk
+          name: ArArShot-v2.0.1-Debug-APK
+          path: release_assets/ArAr-Shot-v2.0.1-debug.apk
           if-no-files-found: warn
 
       - name: Publish Official GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v2.0.0' }}
-          name: "ArAr Shot v2.0.0"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v2.0.1' }}
+          name: "ArAr Shot v2.0.1"
           body_path: RELEASE_NOTES.md
           make_latest: true
           files: release_assets/*.apk

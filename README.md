@@ -3,7 +3,7 @@
 [![Android Build](https://github.com/gudangjoker/ArAr-Shot/actions/workflows/android-build.yml/badge.svg)](https://github.com/gudangjoker/ArAr-Shot/actions/workflows/android-build.yml)
 ![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%20(Android%207.0)-blue)
 ![Android Target SDK](https://img.shields.io/badge/Target%20SDK-34%20(Android%2014)-green)
-![Release](https://img.shields.io/badge/Release-v2.0.0-purple)
+![Release](https://img.shields.io/badge/Release-v2.0.1-purple)
 ![Privasi](https://img.shields.io/badge/Privasi-100%25%20Offline-success)
 
 Aplikasi editor foto Android yang berjalan 100% secara luring (tanpa internet) menggunakan pemrosesan native C++17 dan model neural NCNN on-device.
