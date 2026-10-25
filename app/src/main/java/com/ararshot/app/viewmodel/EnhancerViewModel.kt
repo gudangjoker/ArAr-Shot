@@ -180,7 +180,7 @@ class EnhancerViewModel : ViewModel() {
     }
 
     /**
-     * Executes AI Super-Resolution or Remini Face & Portrait Restoration via TileProcessor.
+     * Executes AI Super-Resolution or Face & Portrait Restoration via TileProcessor.
      */
     fun runAiEnhance(context: Context, mode: Int, strength: Float) {
         val src = _workingBitmap.value ?: return

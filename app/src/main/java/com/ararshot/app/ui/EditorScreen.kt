@@ -391,7 +391,7 @@ fun EditorScreen(
                     .padding(horizontal = 18.dp, vertical = 18.dp)
             ) {
                 when (currentTab) {
-                    // TAB 1: REMINI FACE RESTORATION & AI 4X SUPER-RESOLUTION
+                    // TAB 1: RESTORASI WAJAH & AI 4X SUPER-RESOLUTION
                     EditorTab.AI_ENHANCE -> {
                         Text("Pilihan Restorasi Wajah & AI 4X", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(8.dp))

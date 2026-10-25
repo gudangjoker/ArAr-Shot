@@ -721,12 +721,12 @@ std::vector<DetectedFace> detectFacesInternal(const uint32_t* src, int width, in
 }
 
 // ---------------------------------------------------------------------------
-// Remini-Level Blind Face Restoration Pipeline
+// Blind Face Restoration Pipeline
 // Combines Neural Face Super-Resolution + Frequency-Separated Skin Pore
 // Reconstruction + 5-Landmark Iris/Cornea/Lip Micro-Contrast Enhancement
 // ---------------------------------------------------------------------------
 
-void restoreFacesRemini(const uint32_t* src, uint32_t* dst, int width, int height, float fidelityStrength) {
+void restoreFacesNeural(const uint32_t* src, uint32_t* dst, int width, int height, float fidelityStrength) {
     if (!src || !dst || width <= 0 || height <= 0) return;
 
     float strength = std::clamp(fidelityStrength, 0.2f, 1.5f);
@@ -2256,7 +2256,7 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_processTileNative(
         }
         case MODE_FACE_RESTORE: {
             dst.resize(tileW * tileH);
-            restoreFacesRemini(src, dst.data(), tileW, tileH, clampedStrength);
+            restoreFacesNeural(src, dst.data(), tileW, tileH, clampedStrength);
             break;
         }
         default: {
@@ -2315,7 +2315,7 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_processBitmapNative(
             unsharpMask(src, dst, w, h, 1.2f * s, 1.5f);
             break;
         case MODE_FACE_RESTORE:
-            restoreFacesRemini(src, dst, w, h, s);
+            restoreFacesNeural(src, dst, w, h, s);
             break;
         case MODE_COMBINED_ENHANCE:
         default: {
@@ -2423,7 +2423,7 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_restoreFacesNative(
     if (!srcPtr) return nullptr;
 
     std::vector<uint32_t> dst(width * height);
-    restoreFacesRemini(reinterpret_cast<const uint32_t*>(srcPtr), dst.data(), width, height, strength);
+    restoreFacesNeural(reinterpret_cast<const uint32_t*>(srcPtr), dst.data(), width, height, strength);
     env->ReleaseIntArrayElements(srcPixels, srcPtr, JNI_ABORT);
 
     jintArray result = env->NewIntArray(width * height);

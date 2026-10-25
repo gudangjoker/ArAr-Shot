@@ -1,40 +1,46 @@
-# 📸 ArAr Shot Pro v.2.0.0 — Release Notes
+# 📸 ArAr Shot v2.0.0 — Catatan Rilis
 
-## Versi 2.0.0 (Remini-Level 6-Model Offline SOTA AI Suite)
+**Versi**: 2.0.0  
 **Tanggal Rilis**: 25 Oktober 2026  
 **Package Name**: `com.ararshot.app`  
-**Tipe Rilis**: Edisi Studio Flagship (100% Offline Bundled SOTA Neural Suite)  
-**Status Tanda Tangan**: Signed (Valid RSA 2048-bit Keystore)
+
+Pembaruan v2.0.0 menghadirkan peningkatan performa pemrosesan, perbaikan algoritma penghapus latar belakang, perombakan antarmuka pengguna (UI), dan lokalisasi penuh bahasa Indonesia.
 
 ---
 
-### 🧠 6 Model SOTA Open-Source NCNN Terintegrasi Langsung (~77.2 MB Offline)
-1. **SCRFD-500M-KPS (`scrfd_500m_kps-opt2.param/.bin`)** — Deteksi Wajah & 5 Titik Landmark Anatomis (Mata Kiri/Kanan, Hidung, Sudut Bibir) untuk **Remini Face & Portrait Restoration** serta auto-center biometrik Pasfoto Resmi ICAO.
-2. **Real-ESRGAN x4v3 Crisp (`realesr-general-x4v3.param/.bin`)** — Rekonstruksi 4x Super-Resolution tekstur tajam.
-3. **Real-ESRGAN x4v3 WDN (`realesr-general-wdn-x4v3.param/.bin`)** — Rekonstruksi 4x Super-Resolution dengan *Denoise* terintegrasi untuk foto low-light/kompresi WhatsApp.
-4. **MODNet Alpha Matting (`modnet_matting.param/.bin`)** — Pemisahan helai rambut halus (*sub-pixel hair alpha matting*) yang dipadukan dengan $O(N)$ **Fast Guided Image Filter** (He et al.) dan *Foreground Color Decontamination*.
-5. **Depth Anything (`dpt256.param/.bin`)** — Estimasi kedalaman 3D monokular (*continuous 3D depth map*) untuk **DSLR Optical Disc Bokeh** dan **3D Studio Normal-Map Relighting**.
-6. **AnimeGANv2 (`face_paint_512_v2.param/.bin`)** — Neural style transfer portrait & lanskap anime Jepang, dikombinasikan dengan **Anisotropic Kuwahara Filter** dan kontur tinta *Difference-of-Gaussians* (DoG).
+### ✨ Pembaruan & Fitur
+
+1. **Perbaikan Penghapus Latar Belakang (*Background Remover*)**:
+   - Penerapan *letterbox padding* ($512 \times 512$) untuk menjaga rasio aspek foto non-persegi agar batas subjek tidak terdistorsi.
+   - Logika fusi adaptif antara ML Kit dan MODNet untuk melindungi area pakaian dan tubuh agar tidak terhapus.
+   - Penyesuaian filter terarah (*guided filter*) dan transisi *smoothstep* untuk tepian anti-aliased yang bersih dan rapi.
+
+2. **Restorasi Wajah & Resolusi 4X**:
+   - Deteksi titik wajah (SCRFD) dan peningkatan resolusi area wajah menggunakan model Real-ESRGAN NCNN.
+   - Pemisahan frekuensi untuk merapikan tekstur kulit dan memperjelas detail mata dan bibir.
+
+3. **Efek Kedalaman 3D & Pencahayaan**:
+   - Peta kedalaman monokular (Depth Anything) untuk efek blur lensa DSLR dan arah pencahayaan studio.
+
+4. **Pewarnaan Foto Hitam-Putih**:
+   - Rekonstruksi warna pada ruang warna CIE LAB untuk wajah, dedaunan, dan langit.
+
+5. **Gaya Anime & Kamera Lawas**:
+   - Filter ilustrasi anime (AnimeGANv2) dan nuansa kamera saku 2000-an lengkap dengan cap tanggal LCD.
+
+6. **Pasfoto Resmi & Lembar Cetak 4R**:
+   - Pilihan ukuran pasfoto resmi (2x3, 3x4, 4x6, visa) dengan latar belakang standar dan susunan kisi cetak 4R.
+
+7. **Studio Kolase Foto**:
+   - Penggabungan 2 hingga 4 foto dengan pengaturan jarak antarfoto dan sudut melengkung.
+
+8. **Antarmuka & Bahasa Indonesia**:
+   - Desain antarmuka baru bertema Aperture dengan kontras yang nyaman.
+   - Seluruh teks, label alat, slider, dialog, dan pesan status menggunakan Bahasa Indonesia.
 
 ---
 
-### 🔬 Peningkatan Presisi Matematis & C++17 OpenMP Engine (`libarar_engine.so`)
-- **Remini-Level Face & Portrait Restoration (`MODE_FACE_RESTORE`)**:
-  - Mendeteksi wajah & 5 landmark anatomis via SCRFD, melakukan 4x neural super-resolution pada area wajah, lalu menerapkan *Frequency Separation* ($\text{Low-Frequency Bilateral Skin Base} + \text{High-Frequency Pore/Hair Detail}$) serta peningkatan kontras mikro selektif pada iris mata, bulu mata, dan bibir, sebelum digabungkan kembali menggunakan *elliptical feathered mask*.
-- **Zero-Seam 2D Hann/Cosine Tile Blending (`blendTileWithWeightNative`)**:
-  - Menggunakan akumulator bobot `weightMap` persisten lintas seluruh tile dengan *2D Raised-Cosine Window* pada area *overlap*, menghilangkan bug penggelapan tile dan sambungan garis (*seam lines*).
-- **Exact $O(N)$ Euclidean Distance Transform (Felzenszwalb-Huttenlocher EDT)**:
-  - Menghasilkan *sticker outline* anti-aliased sub-piksel yang mulus sempurna dalam waktu $O(N)$ linear serta *drop shadow* Gaussian terpisah.
-- **CIE LAB Perceptual Semantic Colorization**:
-  - Mewarnai foto hitam-putih pada ruang krominansi $(a^*, b^*)$ dengan *edge-guided chrominance propagation* dan prior wajah/langit/dedaunan tanpa mengubah ketajaman luminansi $L^*$ asli.
-- **Eikonal Gradient + Exemplar Patch Texture Inpainting**:
-  - Memperbaiki *Magic Eraser* dengan proyeksi gradien orde pertama Telea dan transfer tekstur *high-frequency* dari *patch* tetangga terdekat.
+### 🔒 Privasi
 
----
-
-### 🎨 Peningkatan UI/UX & Privasi
-- **Undo & Redo Multi-Langkah**: Riwayat pengeditan non-destruktif langsung di `TopAppBar`.
-- **Before/After Slider Lintas Tab**: Bandingkan foto asli vs hasil AI kapan saja di berbagai fitur studio.
-- **Auto-Correction EXIF Orientation & Ekspor PNG Transparan Lossless**:
-  - Foto portrait kamera otomatis tegak sesuai metadata EXIF, dan hasil hapus background (`TRANSPARENT`) otomatis diekspor sebagai `.png` 32-bit RGBA transparan.
-- **100% Privasi Murni**: Menghapus izin mikrofon/audio yang tidak diperlukan; aplikasi hanya meminta izin Kamera & Foto Galeri tanpa izin Internet sama sekali.
+- 100% Offline: Berjalan langsung di perangkat tanpa koneksi internet.
+- Tanpa izin internet, tanpa audio/mikrofon, dan tanpa telemetri pelacakan.

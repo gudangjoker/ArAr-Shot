@@ -107,8 +107,8 @@ class MainActivityTest {
     }
 
     @Test
-    fun testReminiFaceRestoreMode() = runBlocking {
-        println("=== Testing Remini Face & Portrait Restoration Mode ===")
+    fun testFaceRestoreMode() = runBlocking {
+        println("=== Testing Face & Portrait Restoration Mode ===")
         val src = Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888)
         src.eraseColor(Color.rgb(210, 170, 145))
 

@@ -33,7 +33,7 @@ object TileProcessor {
     ): Flow<TileProgress> = flow {
         ImageEnhancerNative.ensureNativeLoaded()
 
-        // Remini Face & Portrait Restoration requires full-face landmark context
+        // Restorasi Wajah & Potret requires full-face landmark context
         if (mode == ImageEnhancerNative.MODE_FACE_RESTORE) {
             emit(TileProgress(0, 2, 0.25f))
             val faceRestored = ImageEnhancerNative.restoreFaces(input, strength)

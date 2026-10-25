@@ -52,9 +52,9 @@ void cosineTileBlendWithOverlap(const uint32_t* tile, int tileW, int tileH, int 
 void cosineTileBlend(const uint32_t* tile, int tileW, int tileH, int dstX, int dstY,
                      uint32_t* target, float* weightMap, int targetW, int targetH);
 
-// Remini-Level Face Detection & Blind Face Restoration Pipeline
+// Face Detection & Blind Face Restoration Pipeline
 std::vector<DetectedFace> detectFacesInternal(const uint32_t* src, int width, int height);
-void restoreFacesRemini(const uint32_t* src, uint32_t* dst, int width, int height, float fidelityStrength);
+void restoreFacesNeural(const uint32_t* src, uint32_t* dst, int width, int height, float fidelityStrength);
 
 // Guided Alpha Matting & Monocular 3D Depth Estimation
 void extractAlphaMatteInternal(const uint32_t* src, const float* coarseMask, float* outAlpha, int width, int height);

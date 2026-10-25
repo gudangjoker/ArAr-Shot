@@ -112,7 +112,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v2.0.0' }}
-          name: "ArAr Shot Pro v.2.0.0 (Remini-Level 6-Model Offline SOTA AI Suite)"
+          name: "ArAr Shot v2.0.0"
           body_path: RELEASE_NOTES.md
           make_latest: true
           files: release_assets/*.apk

@@ -267,7 +267,7 @@ object ImageEnhancerNative {
      * - MODE_BILATERAL_DENOISE (1): Edge-Preserving Bilateral Denoise
      * - MODE_UNSHARP_MASK (2): Adaptive Luminance Unsharp Mask
      * - MODE_COMBINED_ENHANCE (3): Denoise + 4x SR + Micro-Contrast
-     * - MODE_FACE_RESTORE (4): Remini-Level Face & Portrait Restoration (SCRFD + Neural Face SR + Frequency Separation)
+     * - MODE_FACE_RESTORE (4): Restorasi Wajah & Potret (SCRFD + Neural Face SR + Frequency Separation)
      */
     fun enhanceImage(input: Bitmap, mode: Int = MODE_SUPER_RESOLUTION, strength: Float = 0.8f): Bitmap {
         ensureNativeLoaded()
@@ -355,7 +355,7 @@ object ImageEnhancerNative {
     }
 
     /**
-     * Remini-level Face & Portrait Restoration.
+     * Restorasi Wajah & Potret.
      */
     fun restoreFaces(input: Bitmap, strength: Float = 0.85f): Bitmap {
         return enhanceImage(input, MODE_FACE_RESTORE, strength)
