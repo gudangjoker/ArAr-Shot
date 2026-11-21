@@ -69,15 +69,15 @@ jobs:
 
           for f in app/build/outputs/apk/release/*.apk; do
             if [ -f "$f" ]; then
-              cp -v "$f" "release_assets/ArAr-Shot-v3.1.0.apk"
-              cp -v "$f" "release_assets/ArAr-Shot-v3.1.0-release.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v3.1.1.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v3.1.1-release.apk"
               break
             fi
           done
 
           for f in app/build/outputs/apk/debug/*.apk; do
             if [ -f "$f" ]; then
-              cp -v "$f" "release_assets/ArAr-Shot-v3.1.0-debug.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v3.1.1-debug.apk"
               break
             fi
           done
@@ -87,23 +87,23 @@ jobs:
       - name: Upload Signed Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v3.1.0-Release-APK
-          path: release_assets/ArAr-Shot-v3.1.0*.apk
+          name: ArArShot-v3.1.1-Release-APK
+          path: release_assets/ArAr-Shot-v3.1.1*.apk
           if-no-files-found: error
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v3.1.0-Debug-APK
-          path: release_assets/ArAr-Shot-v3.1.0-debug.apk
+          name: ArArShot-v3.1.1-Debug-APK
+          path: release_assets/ArAr-Shot-v3.1.1-debug.apk
           if-no-files-found: warn
 
       - name: Publish Official GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v3.1.0' }}
-          name: "ArAr Shot v3.1.0"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v3.1.1' }}
+          name: "ArAr Shot v3.1.1"
           body_path: RELEASE_NOTES.md
           make_latest: true
           files: release_assets/*.apk

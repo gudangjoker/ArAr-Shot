@@ -111,6 +111,7 @@ fun EditorScreen(
     val canUndo by viewModel.canUndo.collectAsState()
     val canRedo by viewModel.canRedo.collectAsState()
     val animationModelsState by viewModel.animationModelsState.collectAsState()
+    val selectedAnimationStyle by viewModel.selectedAnimationStyle.collectAsState()
 
     var splitCompare by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
@@ -405,7 +406,9 @@ fun EditorScreen(
                         }
                     )
                     EditorTool.ANIMATION -> AnimationPanel(
+                        selectedStyle = selectedAnimationStyle,
                         modelsState = animationModelsState,
+                        onSelectStyle = { viewModel.selectAnimationStyle(it) },
                         onDownloadStyle = { style ->
                             viewModel.downloadAnimationStyle(context, style)
                         },

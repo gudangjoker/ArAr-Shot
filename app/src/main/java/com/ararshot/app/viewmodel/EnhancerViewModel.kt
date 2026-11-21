@@ -90,6 +90,8 @@ class EnhancerViewModel : ViewModel() {
 
     private val _animationModelsState = MutableStateFlow(AnimationModelsUiState())
     val animationModelsState: StateFlow<AnimationModelsUiState> = _animationModelsState.asStateFlow()
+    private val _selectedAnimationStyle = MutableStateFlow(AnimationStyle.ANIMATION_3D)
+    val selectedAnimationStyle: StateFlow<AnimationStyle> = _selectedAnimationStyle.asStateFlow()
     private var animationDownloadJob: Job? = null
 
     private val _inpaintMask = MutableStateFlow<Bitmap?>(null)
@@ -126,6 +128,10 @@ class EnhancerViewModel : ViewModel() {
 
     fun selectTool(tool: EditorTool) {
         _activeTool.value = tool
+    }
+
+    fun selectAnimationStyle(style: AnimationStyle) {
+        _selectedAnimationStyle.value = style
     }
 
     private fun syncUndoFlags() {
@@ -197,8 +203,16 @@ class EnhancerViewModel : ViewModel() {
         generateFilterThumbnails(bitmap)
     }
 
-    fun loadFromUri(context: Context, uri: Uri, initialTool: EditorTool = EditorTool.ADJUST) {
+    fun loadFromUri(
+        context: Context,
+        uri: Uri,
+        initialTool: EditorTool = EditorTool.ADJUST,
+        initialAnimationStyle: AnimationStyle? = null
+    ) {
         _activeTool.value = initialTool
+        if (initialAnimationStyle != null) {
+            _selectedAnimationStyle.value = initialAnimationStyle
+        }
         _processState.value = ProcessState.Processing(0.2f, "Membuka foto...")
         viewModelScope.launch(Dispatchers.IO) {
             try {

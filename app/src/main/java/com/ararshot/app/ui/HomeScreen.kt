@@ -34,16 +34,23 @@ import androidx.compose.material.icons.automirrored.filled.ViewQuilt
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.DesignServices
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Filter
 import androidx.compose.material.icons.filled.Healing
+import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -105,6 +112,7 @@ fun HomeScreen(
 
     var showModelManager by remember { mutableStateOf(false) }
     var pendingTool by remember { mutableStateOf(EditorTool.ADJUST) }
+    var pendingAnimationStyle by remember { mutableStateOf<AnimationStyle?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshAnimationModels(context)
@@ -115,7 +123,13 @@ fun HomeScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         uri?.let {
-            viewModel.loadFromUri(context, it, initialTool = pendingTool)
+            viewModel.loadFromUri(
+                context = context,
+                uri = it,
+                initialTool = pendingTool,
+                initialAnimationStyle = pendingAnimationStyle
+            )
+            pendingAnimationStyle = null
             onNavigateToEditor()
         }
     }
@@ -182,13 +196,27 @@ fun HomeScreen(
         else Toast.makeText(context, "Izin kamera diperlukan", Toast.LENGTH_SHORT).show()
     }
 
-    fun openPickerFor(tool: EditorTool) {
+    fun openPickerFor(tool: EditorTool, animationStyle: AnimationStyle? = null) {
         pendingTool = tool
+        pendingAnimationStyle = animationStyle
         singlePhotoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
     val installedModelsCount = animationModelsState.installedIds.size
     val totalModelsCount = AnimationStyle.entries.size
+
+    val installedAnimationShortcuts = AnimationStyle.entries
+        .filter { it.id in animationModelsState.installedIds }
+        .map { style ->
+            ToolShortcutItem(
+                id = "anim_${style.id}",
+                title = style.displayName,
+                subtitle = style.subtitle,
+                icon = animationStyleIcon(style),
+                accentColor = animationStyleAccent(style),
+                onClick = { openPickerFor(EditorTool.ANIMATION, animationStyle = style) }
+            )
+        }
 
     val shortcuts = listOf(
         ToolShortcutItem(
@@ -395,6 +423,38 @@ fun HomeScreen(
             items(shortcuts, key = { it.id }) { item ->
                 ToolShortcutCard(item = item)
             }
+
+            // Direct Icon Shortcuts for Downloaded Animation Models (each picks its own photo)
+            if (installedAnimationShortcuts.isNotEmpty()) {
+                item(span = { GridItemSpan(2) }) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Gaya Animasi Terpasang",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = ArArColors.TextSecondary
+                        )
+                        Text(
+                            text = "Kelola",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = ArArColors.AccentCyan,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(100))
+                                .clickable { showModelManager = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                items(installedAnimationShortcuts, key = { it.id }) { item ->
+                    ToolShortcutCard(item = item)
+                }
+            }
         }
     }
 
@@ -456,4 +516,24 @@ private fun ToolShortcutCard(item: ToolShortcutItem) {
             )
         }
     }
+}
+
+private fun animationStyleIcon(style: AnimationStyle): ImageVector = when (style) {
+    AnimationStyle.ANIMATION_3D -> Icons.Default.ViewInAr
+    AnimationStyle.ARTSTYLE -> Icons.Default.Palette
+    AnimationStyle.HANDDRAWN -> Icons.Default.Draw
+    AnimationStyle.ILLUSTRATION -> Icons.Default.AutoStories
+    AnimationStyle.DESIGN -> Icons.Default.DesignServices
+    AnimationStyle.SKETCH -> Icons.Default.Edit
+    AnimationStyle.SCENE_CARTOON -> Icons.Default.Landscape
+}
+
+private fun animationStyleAccent(style: AnimationStyle): Color = when (style) {
+    AnimationStyle.ANIMATION_3D -> Color(0xFF38BDF8)
+    AnimationStyle.ARTSTYLE -> Color(0xFFF472B6)
+    AnimationStyle.HANDDRAWN -> Color(0xFFFBBF24)
+    AnimationStyle.ILLUSTRATION -> Color(0xFFA78BFA)
+    AnimationStyle.DESIGN -> Color(0xFF34D399)
+    AnimationStyle.SKETCH -> Color(0xFF94A3B8)
+    AnimationStyle.SCENE_CARTOON -> Color(0xFFFB923C)
 }

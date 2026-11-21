@@ -772,13 +772,14 @@ fun ErasePanel(
 
 @Composable
 fun AnimationPanel(
+    selectedStyle: AnimationStyle,
     modelsState: AnimationModelsUiState,
+    onSelectStyle: (AnimationStyle) -> Unit,
     onDownloadStyle: (AnimationStyle) -> Unit,
     onCancelDownload: () -> Unit,
     onOpenModelManager: () -> Unit,
     onApply: (style: AnimationStyle, strength: Float) -> Unit
 ) {
-    var selectedStyle by remember { mutableStateOf(AnimationStyle.ANIMATION_3D) }
     var strength by remember { mutableStateOf(0.92f) }
 
     val isInstalled = selectedStyle.id in modelsState.installedIds
@@ -806,7 +807,7 @@ fun AnimationPanel(
                             color = if (selected) ArArColors.AccentCyan else ArArColors.Border,
                             shape = RoundedCornerShape(100)
                         )
-                        .clickable { selectedStyle = style }
+                        .clickable { onSelectStyle(style) }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

@@ -6,7 +6,7 @@ plugins {
 }
 
 base {
-    archivesName.set("ArAr-Shot-v3.1.0")
+    archivesName.set("ArAr-Shot-v3.1.1")
 }
 
 android {
@@ -18,8 +18,8 @@ android {
         applicationId = "com.ararshot.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 11
-        versionName = "3.1.0"
+        versionCode = 12
+        versionName = "3.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
