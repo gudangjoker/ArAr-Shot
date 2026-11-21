@@ -1,142 +1,137 @@
 package com.ararshot.app.ui.components
 
 import android.graphics.Bitmap
-import android.graphics.Canvas as AndroidCanvas
-import android.graphics.Color as AndroidColor
-import android.graphics.Paint as AndroidPaint
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
-import kotlin.math.min
-import kotlin.math.roundToInt
 
 @Composable
 fun InpaintBrushView(
-    sourceBitmap: Bitmap,
+    baseBitmap: Bitmap,
     maskBitmap: Bitmap,
-    brushRadius: Float,
-    isErasing: Boolean = false,
-    modifier: Modifier = Modifier,
-    onMaskUpdated: () -> Unit
+    brushRadiusPx: Float,
+    isErasing: Boolean,
+    maskRevision: Int,
+    onMaskUpdated: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var redrawTick by remember { mutableIntStateOf(0) }
-    val maskCanvas = remember(maskBitmap) { AndroidCanvas(maskBitmap) }
-    val drawPaint = remember(brushRadius, isErasing) {
-        AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-            if (isErasing) {
-                color = AndroidColor.TRANSPARENT
-                xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
-            } else {
-                color = AndroidColor.WHITE
-                xfermode = null
-            }
-            style = AndroidPaint.Style.STROKE
-            strokeCap = AndroidPaint.Cap.ROUND
-            strokeJoin = AndroidPaint.Join.ROUND
-            strokeWidth = brushRadius * 2f
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
+    var localStrokeTick by remember { mutableIntStateOf(0) }
+    val currentRadius by rememberUpdatedState(brushRadiusPx)
+    val currentErasing by rememberUpdatedState(isErasing)
+    val currentOnUpdated by rememberUpdatedState(onMaskUpdated)
+
+    val drawPaint = remember {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL_AND_STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
         }
     }
 
-    Box(modifier = modifier) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(brushRadius, isErasing, sourceBitmap, maskBitmap) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val fitScale = min(
-                                size.width / sourceBitmap.width.toFloat(),
-                                size.height / sourceBitmap.height.toFloat()
-                            )
-                            val drawW = sourceBitmap.width * fitScale
-                            val drawH = sourceBitmap.height * fitScale
-                            val left = (size.width - drawW) * 0.5f
-                            val top = (size.height - drawH) * 0.5f
+    fun mapToImage(offset: Offset): Pair<Float, Float>? {
+        val bw = boxSize.width.toFloat()
+        val bh = boxSize.height.toFloat()
+        if (bw <= 0f || bh <= 0f) return null
+        val imgW = baseBitmap.width.toFloat()
+        val imgH = baseBitmap.height.toFloat()
+        val scale = minOf(bw / imgW, bh / imgH)
+        val drawnW = imgW * scale
+        val drawnH = imgH * scale
+        val left = (bw - drawnW) / 2f
+        val top = (bh - drawnH) / 2f
+        val ix = (offset.x - left) / scale
+        val iy = (offset.y - top) / scale
+        if (ix < 0f || ix > imgW || iy < 0f || iy > imgH) return null
+        return ix to iy
+    }
 
-                            if (drawW > 0f && drawH > 0f) {
-                                val bx = ((offset.x - left) / drawW) * maskBitmap.width
-                                val by = ((offset.y - top) / drawH) * maskBitmap.height
-
-                                drawPaint.style = AndroidPaint.Style.FILL
-                                maskCanvas.drawCircle(bx, by, brushRadius, drawPaint)
-                                drawPaint.style = AndroidPaint.Style.STROKE
-                                redrawTick++
-                                onMaskUpdated()
-                            }
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val fitScale = min(
-                                size.width / sourceBitmap.width.toFloat(),
-                                size.height / sourceBitmap.height.toFloat()
-                            )
-                            val drawW = sourceBitmap.width * fitScale
-                            val drawH = sourceBitmap.height * fitScale
-                            val left = (size.width - drawW) * 0.5f
-                            val top = (size.height - drawH) * 0.5f
-
-                            if (drawW > 0f && drawH > 0f) {
-                                val prevX = (((change.position.x - dragAmount.x) - left) / drawW) * maskBitmap.width
-                                val prevY = (((change.position.y - dragAmount.y) - top) / drawH) * maskBitmap.height
-                                val currX = ((change.position.x - left) / drawW) * maskBitmap.width
-                                val currY = ((change.position.y - top) / drawH) * maskBitmap.height
-
-                                maskCanvas.drawLine(prevX, prevY, currX, currY, drawPaint)
-                                redrawTick++
-                                onMaskUpdated()
-                            }
-                        }
-                    )
-                }
-        ) {
-            // Read redrawTick to ensure immediate Canvas invalidation on brush strokes
-            val tick = redrawTick
-            if (tick >= 0) {
-                val fitScale = min(
-                    size.width / sourceBitmap.width.toFloat(),
-                    size.height / sourceBitmap.height.toFloat()
-                )
-                val drawW = (sourceBitmap.width * fitScale).roundToInt().coerceAtLeast(1)
-                val drawH = (sourceBitmap.height * fitScale).roundToInt().coerceAtLeast(1)
-                val left = ((size.width - drawW) * 0.5f).roundToInt()
-                val top = ((size.height - drawH) * 0.5f).roundToInt()
-
-                val dstOffset = IntOffset(left, top)
-                val dstSize = IntSize(drawW, drawH)
-
-                // Draw underlying aspect-preserved image
-                drawImage(
-                    image = sourceBitmap.asImageBitmap(),
-                    dstOffset = dstOffset,
-                    dstSize = dstSize
-                )
-
-                // Draw translucent red/magenta mask overlay aligned 1:1 with sourceBitmap
-                drawImage(
-                    image = maskBitmap.asImageBitmap(),
-                    dstOffset = dstOffset,
-                    dstSize = dstSize,
-                    alpha = 0.55f,
-                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
-                        Color(0xFFFF1744),
-                        blendMode = androidx.compose.ui.graphics.BlendMode.SrcAtop
-                    )
-                )
-            }
+    fun paintPoint(x: Float, y: Float, prevX: Float?, prevY: Float?) {
+        val canvas = Canvas(maskBitmap)
+        val scaleFactor = baseBitmap.width.toFloat() / boxSize.width.coerceAtLeast(1).toFloat()
+        val r = (currentRadius * scaleFactor).coerceAtLeast(4f)
+        if (currentErasing) {
+            drawPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+            drawPaint.color = android.graphics.Color.TRANSPARENT
+        } else {
+            drawPaint.xfermode = null
+            drawPaint.color = android.graphics.Color.argb(170, 239, 68, 68)
         }
+        drawPaint.strokeWidth = r * 2f
+        if (prevX != null && prevY != null) {
+            canvas.drawLine(prevX, prevY, x, y, drawPaint)
+        } else {
+            canvas.drawCircle(x, y, r, drawPaint)
+        }
+        localStrokeTick++
+        currentOnUpdated()
+    }
+
+    val baseImg = remember(baseBitmap) { baseBitmap.asImageBitmap() }
+    val maskImg = remember(maskBitmap, maskRevision, localStrokeTick) { maskBitmap.asImageBitmap() }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { boxSize = it }
+            .pointerInput(maskBitmap, baseBitmap) {
+                detectTapGestures { offset ->
+                    mapToImage(offset)?.let { (x, y) -> paintPoint(x, y, null, null) }
+                }
+            }
+            .pointerInput(maskBitmap, baseBitmap) {
+                var lastPt: Pair<Float, Float>? = null
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        lastPt = mapToImage(offset)
+                        lastPt?.let { (x, y) -> paintPoint(x, y, null, null) }
+                    },
+                    onDragEnd = { lastPt = null },
+                    onDragCancel = { lastPt = null },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val cur = mapToImage(change.position)
+                        if (cur != null) {
+                            paintPoint(cur.first, cur.second, lastPt?.first, lastPt?.second)
+                            lastPt = cur
+                        }
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            bitmap = baseImg,
+            contentDescription = "Foto",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+        Image(
+            bitmap = maskImg,
+            contentDescription = "Area hapus",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }

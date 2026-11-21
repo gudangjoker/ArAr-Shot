@@ -3,10 +3,11 @@ package com.ararshot.app.engine
 import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.util.Log
+import com.ararshot.app.model.ColorAdjustments
+import kotlin.math.exp
 import kotlin.math.max
-import kotlin.math.min
+import kotlin.math.pow
 
 data class DetectedFaceBox(
     val x: Float,
@@ -18,26 +19,29 @@ data class DetectedFaceBox(
 )
 
 object ImageEnhancerNative {
-    private const val TAG = "ImageEnhancerNative"
+    private const val TAG = "ArArNative"
 
     const val MODE_SUPER_RESOLUTION = 0
     const val MODE_BILATERAL_DENOISE = 1
     const val MODE_UNSHARP_MASK = 2
     const val MODE_COMBINED_ENHANCE = 3
     const val MODE_FACE_RESTORE = 4
+    const val MODE_DENOISE_ONLY = 5
+
+    const val ANIME_STYLE_SMOOTH = 0
+    const val ANIME_STYLE_ILLUSTRATION = 1
+    const val ANIME_STYLE_SKETCH = 2
 
     const val MAX_OUTPUT_DIMENSION = 4096
 
     @Volatile
     private var isNativeLibraryLoaded = false
+
     @Volatile
-    private var isModelLoaded = false
+    private var isAssetManagerReady = false
+
     private var loadAttempted = false
 
-    /**
-     * Lazily and safely loads the native C++ libraries (libncnn and libarar_engine).
-     * Avoids startup class-initialization crashes on any device or JVM test environment.
-     */
     @Synchronized
     fun ensureNativeLoaded(): Boolean {
         if (loadAttempted) return isNativeLibraryLoaded
@@ -45,35 +49,38 @@ object ImageEnhancerNative {
 
         try {
             System.loadLibrary("ncnn")
-            Log.i(TAG, "libncnn loaded successfully.")
         } catch (t: Throwable) {
-            Log.w(TAG, "libncnn load status: ${t.message}")
+            Log.w(TAG, "libncnn load notice: ${t.message}")
         }
 
         try {
             System.loadLibrary("arar_engine")
             isNativeLibraryLoaded = true
-            Log.i(TAG, "Native library 'arar_engine' loaded successfully.")
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to load 'arar_engine' native library: ${t.message}")
+            Log.e(TAG, "Failed to load arar_engine: ${t.message}")
             isNativeLibraryLoaded = false
         }
-
         return isNativeLibraryLoaded
     }
 
     fun isNativeLoaded(): Boolean = isNativeLibraryLoaded
-    fun isModelReady(): Boolean = isModelLoaded
+    fun isReady(): Boolean = isNativeLibraryLoaded && isAssetManagerReady
 
-    private external fun loadModelNative(
-        assetManager: AssetManager,
-        paramPath: String,
-        binPath: String
-    ): Boolean
+    private external fun initAssetManagerNative(assetManager: AssetManager): Boolean
+    private external fun releaseModelsNative()
 
-    private external fun initAllModelsNative(
-        assetManager: AssetManager
-    ): Boolean
+    private external fun applyLinearColorNative(
+        srcPixels: IntArray,
+        width: Int,
+        height: Int,
+        params: FloatArray
+    ): IntArray?
+
+    private external fun analyzeAutoEnhanceNative(
+        srcPixels: IntArray,
+        width: Int,
+        height: Int
+    ): FloatArray?
 
     external fun processTileNative(
         inPixels: IntArray,
@@ -90,18 +97,6 @@ object ImageEnhancerNative {
         strength: Float
     ): Boolean
 
-    external fun blendTileNative(
-        tilePixels: IntArray,
-        targetPixels: IntArray,
-        tileW: Int,
-        tileH: Int,
-        targetW: Int,
-        targetH: Int,
-        offsetX: Int,
-        offsetY: Int,
-        overlapPx: Int
-    )
-
     external fun blendTileWithWeightNative(
         tilePixels: IntArray,
         targetPixels: IntArray,
@@ -115,35 +110,35 @@ object ImageEnhancerNative {
         overlapPx: Int
     )
 
-    external fun detectFacesNative(
+    private external fun detectFacesNative(
         srcPixels: IntArray,
         width: Int,
         height: Int
     ): FloatArray?
 
-    external fun restoreFacesNative(
+    private external fun restoreFacesNative(
         srcPixels: IntArray,
         width: Int,
         height: Int,
         strength: Float
     ): IntArray?
 
-    external fun extractAlphaMatteNative(
+    private external fun extractAlphaMatteNative(
         srcPixels: IntArray,
         coarseMask: FloatArray?,
         width: Int,
-        height: Int
+        height: Int,
+        isPortraitHint: Boolean
     ): FloatArray?
 
-    external fun estimateDepthNative(
+    private external fun estimateDepthNative(
         srcPixels: IntArray,
         subjectMask: FloatArray?,
         width: Int,
         height: Int
     ): FloatArray?
 
-    // 7 Populer AI Engine Native Functions (aligned 1:1 with native_enhancer.h / native_enhancer.cpp)
-    external fun inpaintNative(
+    private external fun inpaintNative(
         srcPixels: IntArray,
         maskPixels: IntArray,
         width: Int,
@@ -151,7 +146,7 @@ object ImageEnhancerNative {
         radius: Int
     ): IntArray?
 
-    external fun applyBokehNative(
+    private external fun applyBokehNative(
         srcPixels: IntArray,
         depthMask: FloatArray,
         width: Int,
@@ -160,7 +155,7 @@ object ImageEnhancerNative {
         focusDepth: Float
     ): IntArray?
 
-    external fun applyRelightingNative(
+    private external fun applyRelightingNative(
         srcPixels: IntArray,
         depthMask: FloatArray,
         width: Int,
@@ -174,31 +169,15 @@ object ImageEnhancerNative {
         intensity: Float
     ): IntArray?
 
-    external fun applyHalationNative(
+    private external fun applyAnimeStylizeNative(
         srcPixels: IntArray,
         width: Int,
         height: Int,
-        halationStrength: Float,
-        grainAmount: Float,
-        vignetteStrength: Float
+        styleMode: Int,
+        strength: Float
     ): IntArray?
 
-    external fun applyAnimeFilterNative(
-        srcPixels: IntArray,
-        width: Int,
-        height: Int,
-        quantLevels: Int,
-        edgeThreshold: Float
-    ): IntArray?
-
-    external fun colorizeImageNative(
-        srcPixels: IntArray,
-        width: Int,
-        height: Int,
-        saturation: Float
-    ): IntArray?
-
-    external fun applyStudioShadowOutlineNative(
+    private external fun applyStudioShadowOutlineNative(
         srcPixels: IntArray,
         mask: FloatArray,
         width: Int,
@@ -208,49 +187,98 @@ object ImageEnhancerNative {
         shadowOffsetX: Int,
         shadowOffsetY: Int,
         shadowBlur: Float,
+        shadowAlpha: Float,
         bgColor: Int
     ): IntArray?
 
     /**
-     * Initializes all 6 bundled SOTA NCNN models from APK assets:
-     * 1. realesr-general-x4v3 (Crisp 4x Super-Resolution)
-     * 2. realesr-general-wdn-x4v3 (Denoised 4x Super-Resolution)
-     * 3. scrfd_500m_kps-opt2 (Face & 5-Point Landmark Detector)
-     * 4. face_paint_512_v2 (AnimeGANv2 Portrait/Scene Stylizer)
-     * 5. modnet_matting (MODNet Fine Hair Alpha Matting)
-     * 6. dpt256 (Depth Anything Monocular 3D Depth Estimation)
+     * Registers AssetManager for instant startup; NCNN models are lazy-loaded on first use.
      */
     @Synchronized
-    fun initModels(context: Context): Boolean {
-        if (isModelLoaded) return true
-
-        if (!ensureNativeLoaded()) {
-            Log.w(TAG, "Native library not loaded. Image enhancement will use mathematical fallbacks.")
-            return false
-        }
-
+    fun initEngine(context: Context): Boolean {
+        if (isAssetManagerReady) return true
+        if (!ensureNativeLoaded()) return false
         return try {
-            val assetManager = context.assets
-            Log.i(TAG, "Initializing bundled SOTA NCNN model suite from assets...")
-            val success = initAllModelsNative(assetManager) ||
-                loadModelNative(assetManager, "models/realesr-general-x4v3.param", "models/realesr-general-x4v3.bin")
-            isModelLoaded = success
-
-            if (success) {
-                Log.i(TAG, "SOTA NCNN model suite successfully loaded and ready for inference.")
-            } else {
-                Log.w(TAG, "NCNN asset models unavailable; C++17 SOTA DSP fallback active.")
-            }
-            success
+            isAssetManagerReady = initAssetManagerNative(context.applicationContext.assets)
+            isAssetManagerReady
         } catch (t: Throwable) {
-            Log.e(TAG, "Exception during initModels: ${t.message}", t)
+            Log.e(TAG, "initEngine error: ${t.message}", t)
             false
         }
     }
 
-    /**
-     * Guards against OOM when 4x upscaling an already high-resolution image.
-     */
+    fun releaseMemory() {
+        if (isNativeLibraryLoaded) {
+            try {
+                releaseModelsNative()
+            } catch (t: Throwable) {
+                Log.w(TAG, "releaseMemory error: ${t.message}")
+            }
+        }
+    }
+
+    fun applyLinearColor(input: Bitmap, adjustments: ColorAdjustments): Bitmap {
+        if (adjustments.isIdentity()) return input
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val srcPixels = IntArray(width * height)
+        input.getPixels(srcPixels, 0, width, 0, 0, width, height)
+        val params = adjustments.toFloatArray()
+
+        if (isNativeLibraryLoaded) {
+            try {
+                val outPixels = applyLinearColorNative(srcPixels, width, height, params)
+                if (outPixels != null && outPixels.size == width * height) {
+                    val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    out.setHasAlpha(input.hasAlpha())
+                    out.setPixels(outPixels, 0, width, 0, 0, width, height)
+                    return out
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "applyLinearColor native error: ${t.message}", t)
+            }
+        }
+        return applyLinearColorJvmFallback(input, srcPixels, adjustments)
+    }
+
+    fun analyzeAutoEnhance(input: Bitmap, current: ColorAdjustments): ColorAdjustments {
+        ensureNativeLoaded()
+        val width = input.width
+        val height = input.height
+        val srcPixels = IntArray(width * height)
+        input.getPixels(srcPixels, 0, width, 0, 0, width, height)
+
+        if (isNativeLibraryLoaded) {
+            try {
+                val raw = analyzeAutoEnhanceNative(srcPixels, width, height)
+                if (raw != null && raw.size >= ColorAdjustments.PARAMS_COUNT) {
+                    return ColorAdjustments.fromAutoParams(raw, current)
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "analyzeAutoEnhance error: ${t.message}", t)
+            }
+        }
+
+        // Clean JVM fallback for unit tests
+        var sumLum = 0.0
+        val step = max(1, minOf(width, height) / 128)
+        var count = 0
+        for (y in 0 until height step step) {
+            for (x in 0 until width step step) {
+                val p = srcPixels[y * width + x]
+                val r = (p ushr 16) and 0xFF
+                val g = (p ushr 8) and 0xFF
+                val b = p and 0xFF
+                sumLum += (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+                count++
+            }
+        }
+        val avg = if (count > 0) (sumLum / count).toFloat() else 0.5f
+        val expEv = ((0.48f - avg) * 1.2f).coerceIn(-0.6f, 0.7f)
+        return current.copy(exposure = expEv, contrast = 0.14f, shadows = 0.15f, vibrance = 0.15f)
+    }
+
     fun capForSuperResolution(input: Bitmap, scale: Int = 4): Bitmap {
         val maxInputSide = MAX_OUTPUT_DIMENSION / scale
         val curMax = max(input.width, input.height)
@@ -261,15 +289,7 @@ object ImageEnhancerNative {
         return Bitmap.createScaledBitmap(input, newW, newH, true)
     }
 
-    /**
-     * General image enhancement supporting:
-     * - MODE_SUPER_RESOLUTION (0): 4x Real-ESRGAN Super-Resolution
-     * - MODE_BILATERAL_DENOISE (1): Edge-Preserving Bilateral Denoise
-     * - MODE_UNSHARP_MASK (2): Adaptive Luminance Unsharp Mask
-     * - MODE_COMBINED_ENHANCE (3): Denoise + 4x SR + Micro-Contrast
-     * - MODE_FACE_RESTORE (4): Restorasi Wajah & Potret (SCRFD + Neural Face SR + Frequency Separation)
-     */
-    fun enhanceImage(input: Bitmap, mode: Int = MODE_SUPER_RESOLUTION, strength: Float = 0.8f): Bitmap {
+    fun enhanceImage(input: Bitmap, mode: Int = MODE_SUPER_RESOLUTION, strength: Float = 0.85f): Bitmap {
         ensureNativeLoaded()
         val isSuperRes = (mode == MODE_SUPER_RESOLUTION || mode == MODE_COMBINED_ENHANCE)
         val safeInput = if (isSuperRes) capForSuperResolution(input, 4) else input
@@ -304,22 +324,14 @@ object ImageEnhancerNative {
                 outBitmap.setPixels(processedPixels, 0, outW, 0, 0, outW, outH)
                 outBitmap
             } else {
-                Log.w(TAG, "Processed pixels size mismatch, returning original bitmap.")
                 safeInput
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "Error in enhanceImage: ${t.message}", t)
+            Log.e(TAG, "enhanceImage error: ${t.message}", t)
             safeInput
         }
     }
 
-    fun upscaleImage(input: Bitmap, strength: Float = 0.8f): Bitmap {
-        return enhanceImage(input, MODE_SUPER_RESOLUTION, strength)
-    }
-
-    /**
-     * Detects faces and their 5 anatomical landmarks (eyes, nose, mouth corners) using SCRFD NCNN.
-     */
     fun detectFaces(input: Bitmap): List<DetectedFaceBox> {
         ensureNativeLoaded()
         val width = input.width
@@ -331,40 +343,34 @@ object ImageEnhancerNative {
         return try {
             val raw = detectFacesNative(inPixels, width, height) ?: return emptyList()
             val count = raw.size / 15
-            val list = ArrayList<DetectedFaceBox>(count)
-            for (i in 0 until count) {
+            List(count) { i ->
                 val base = i * 15
                 val kps = FloatArray(10)
                 System.arraycopy(raw, base + 5, kps, 0, 10)
-                list.add(
-                    DetectedFaceBox(
-                        x = raw[base],
-                        y = raw[base + 1],
-                        width = raw[base + 2],
-                        height = raw[base + 3],
-                        score = raw[base + 4],
-                        landmarks = kps
-                    )
+                DetectedFaceBox(
+                    x = raw[base],
+                    y = raw[base + 1],
+                    width = raw[base + 2],
+                    height = raw[base + 3],
+                    score = raw[base + 4],
+                    landmarks = kps
                 )
             }
-            list
         } catch (t: Throwable) {
             Log.e(TAG, "detectFaces error: ${t.message}", t)
             emptyList()
         }
     }
 
-    /**
-     * Restorasi Wajah & Potret.
-     */
-    fun restoreFaces(input: Bitmap, strength: Float = 0.85f): Bitmap {
+    fun restoreFaces(input: Bitmap, strength: Float = 0.8f): Bitmap {
         return enhanceImage(input, MODE_FACE_RESTORE, strength)
     }
 
-    /**
-     * Extracts a refined hair-accurate alpha matte in [0.0f, 1.0f] using MODNet NCNN + Fast Guided Filter.
-     */
-    fun extractAlphaMatte(input: Bitmap, coarseMask: FloatArray? = null): FloatArray {
+    fun extractAlphaMatte(
+        input: Bitmap,
+        coarseMask: FloatArray? = null,
+        isPortraitHint: Boolean = true
+    ): FloatArray {
         ensureNativeLoaded()
         val width = input.width
         val height = input.height
@@ -374,7 +380,7 @@ object ImageEnhancerNative {
 
         if (isNativeLibraryLoaded) {
             try {
-                val refined = extractAlphaMatteNative(inPixels, coarseMask, width, height)
+                val refined = extractAlphaMatteNative(inPixels, coarseMask, width, height, isPortraitHint)
                 if (refined != null && refined.size == total) return refined
             } catch (t: Throwable) {
                 Log.e(TAG, "extractAlphaMatte error: ${t.message}", t)
@@ -383,10 +389,6 @@ object ImageEnhancerNative {
         return coarseMask ?: FloatArray(total) { 1.0f }
     }
 
-    /**
-     * Estimates a continuous 3D depth map in [0.0f, 1.0f] (1.0 = closest foreground, 0.0 = farthest background)
-     * using Depth Anything (dpt256 NCNN) + Geodesic 3D Relief + Guided Filter.
-     */
     fun estimateDepth(input: Bitmap, subjectMask: FloatArray? = null): FloatArray {
         ensureNativeLoaded()
         val width = input.width
@@ -403,41 +405,19 @@ object ImageEnhancerNative {
                 Log.e(TAG, "estimateDepth error: ${t.message}", t)
             }
         }
-
-        // JVM fallback: curved dome relief from subjectMask or center prior
-        val fallback = FloatArray(total)
-        val cx = width * 0.5f
-        val cy = height * 0.5f
-        val maxR = max(width, height) * 0.55f
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val idx = y * width + x
-                val d = kotlin.math.hypot(x - cx, y - cy) / maxR
-                val dome = (1.0f - d * d).coerceIn(0.0f, 1.0f)
-                val subj = subjectMask?.get(idx) ?: dome
-                fallback[idx] = (0.65f * subj + 0.35f * dome).coerceIn(0.0f, 1.0f)
-            }
-        }
-        return fallback
+        return subjectMask ?: FloatArray(total) { i -> (i / width).toFloat() / height.coerceAtLeast(1) }
     }
 
-    /**
-     * Magic Eraser: Native Fast Marching Method (Telea) + Exemplar Patch Texture Inpainting.
-     */
     fun inpaint(input: Bitmap, mask: Bitmap, radius: Int = 6): Bitmap {
         ensureNativeLoaded()
         val width = input.width
         val height = input.height
-
         val scaledMask = if (mask.width != width || mask.height != height) {
             Bitmap.createScaledBitmap(mask, width, height, false)
-        } else {
-            mask
-        }
+        } else mask
 
         val inPixels = IntArray(width * height)
         input.getPixels(inPixels, 0, width, 0, 0, width, height)
-
         val maskPixels = IntArray(width * height)
         scaledMask.getPixels(maskPixels, 0, width, 0, 0, width, height)
 
@@ -447,9 +427,9 @@ object ImageEnhancerNative {
             } else null
 
             if (resultPixels != null && resultPixels.size == width * height) {
-                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
-                outBitmap
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+                    setPixels(resultPixels, 0, width, 0, 0, width, height)
+                }
             } else {
                 input.copy(Bitmap.Config.ARGB_8888, true)
             }
@@ -459,9 +439,6 @@ object ImageEnhancerNative {
         }
     }
 
-    /**
-     * Optical Lens Bokeh Blur using on-device depth map.
-     */
     fun depthBokeh(input: Bitmap, depthMask: FloatArray, blurRadius: Float = 16f, focusDepth: Float = 1.0f): Bitmap {
         ensureNativeLoaded()
         val width = input.width
@@ -475,9 +452,9 @@ object ImageEnhancerNative {
             } else null
 
             if (resultPixels != null && resultPixels.size == width * height) {
-                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
-                outBitmap
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+                    setPixels(resultPixels, 0, width, 0, 0, width, height)
+                }
             } else {
                 input.copy(Bitmap.Config.ARGB_8888, true)
             }
@@ -487,9 +464,6 @@ object ImageEnhancerNative {
         }
     }
 
-    /**
-     * 3D Studio Relighting: simulates directional light source following 3D subject curvature.
-     */
     fun relighting3D(
         input: Bitmap,
         depthMask: FloatArray,
@@ -505,8 +479,8 @@ object ImageEnhancerNative {
         val inPixels = IntArray(width * height)
         input.getPixels(inPixels, 0, width, 0, 0, width, height)
 
-        val r = ((lightColor shr 16) and 0xFF) / 255.0f
-        val g = ((lightColor shr 8) and 0xFF) / 255.0f
+        val r = ((lightColor ushr 16) and 0xFF) / 255.0f
+        val g = ((lightColor ushr 8) and 0xFF) / 255.0f
         val b = (lightColor and 0xFF) / 255.0f
 
         return try {
@@ -515,9 +489,9 @@ object ImageEnhancerNative {
             } else null
 
             if (resultPixels != null && resultPixels.size == width * height) {
-                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
-                outBitmap
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+                    setPixels(resultPixels, 0, width, 0, 0, width, height)
+                }
             } else {
                 input.copy(Bitmap.Config.ARGB_8888, true)
             }
@@ -527,123 +501,41 @@ object ImageEnhancerNative {
         }
     }
 
-    /**
-     * AI Anime Cel-Shading (AnimeGANv2 NCNN + Anisotropic Kuwahara + DoG Ink Contour).
-     */
-    fun animeCelShade(input: Bitmap, radius: Int = 4, edgeStrength: Float = 0.8f, vibrancy: Float = 1.0f): Bitmap {
+    fun animeStylize(input: Bitmap, styleMode: Int = ANIME_STYLE_SMOOTH, strength: Float = 0.9f): Bitmap {
         ensureNativeLoaded()
         val width = input.width
         val height = input.height
         val inPixels = IntArray(width * height)
         input.getPixels(inPixels, 0, width, 0, 0, width, height)
 
-        // Map UI radius [2..8] & edgeStrength [0.1..1.5] to native quantLevels & edgeThreshold
-        val quantLevels = (10 - radius).coerceIn(4, 12)
-        val edgeThreshold = (0.42f / edgeStrength.coerceIn(0.2f, 1.8f)).coerceIn(0.12f, 0.75f)
-
         return try {
             val resultPixels = if (isNativeLibraryLoaded) {
-                applyAnimeFilterNative(inPixels, width, height, quantLevels, edgeThreshold)
+                applyAnimeStylizeNative(inPixels, width, height, styleMode, strength)
             } else null
 
             if (resultPixels != null && resultPixels.size == width * height) {
-                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
-                outBitmap
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+                    setPixels(resultPixels, 0, width, 0, 0, width, height)
+                }
             } else {
                 input.copy(Bitmap.Config.ARGB_8888, true)
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "animeCelShade error: ${t.message}", t)
+            Log.e(TAG, "animeStylize error: ${t.message}", t)
             input
         }
     }
 
-    /**
-     * Vintage CCD / CineStill 800T Red Halation & Film Grain.
-     */
-    fun vintageHalation(
-        input: Bitmap,
-        halationRadius: Float = 14f,
-        grainStrength: Float = 0.5f,
-        chromaticShift: Float = 0.6f,
-        warmth: Float = 1.0f
-    ): Bitmap {
-        ensureNativeLoaded()
-        val width = input.width
-        val height = input.height
-        val inPixels = IntArray(width * height)
-        input.getPixels(inPixels, 0, width, 0, 0, width, height)
-
-        val halationStrength = (halationRadius / 18f).coerceIn(0.1f, 1.5f) * warmth.coerceIn(0.5f, 1.5f)
-        val vignetteStrength = chromaticShift.coerceIn(0.0f, 1.2f) * 0.65f
-
-        return try {
-            val resultPixels = if (isNativeLibraryLoaded) {
-                applyHalationNative(inPixels, width, height, halationStrength, grainStrength, vignetteStrength)
-            } else null
-
-            if (resultPixels != null && resultPixels.size == width * height) {
-                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
-                outBitmap
-            } else {
-                input.copy(Bitmap.Config.ARGB_8888, true)
-            }
-        } catch (t: Throwable) {
-            Log.e(TAG, "vintageHalation error: ${t.message}", t)
-            input
-        }
-    }
-
-    /**
-     * Colorize Old B&W Photos with perceptual CIE LAB skin, foliage, and sky chrominance mapping.
-     */
-    fun colorizeGrayscale(
-        input: Bitmap,
-        personMask: FloatArray,
-        skinWarmth: Float = 1.0f,
-        skyCyan: Float = 1.0f
-    ): Bitmap {
-        ensureNativeLoaded()
-        val width = input.width
-        val height = input.height
-        val inPixels = IntArray(width * height)
-        input.getPixels(inPixels, 0, width, 0, 0, width, height)
-
-        val saturation = ((skinWarmth + skyCyan) * 0.5f).coerceIn(0.2f, 2.0f)
-
-        return try {
-            val resultPixels = if (isNativeLibraryLoaded) {
-                colorizeImageNative(inPixels, width, height, saturation)
-            } else null
-
-            if (resultPixels != null && resultPixels.size == width * height) {
-                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
-                outBitmap
-            } else {
-                input.copy(Bitmap.Config.ARGB_8888, true)
-            }
-        } catch (t: Throwable) {
-            Log.e(TAG, "colorizeGrayscale error: ${t.message}", t)
-            input
-        }
-    }
-
-    /**
-     * Studio Product Drop Shadow and Exact EDT Anti-Aliased Sticker Outline.
-     */
     fun studioShadowOutline(
         input: Bitmap,
         mask: FloatArray,
-        shadowDx: Int = 12,
-        shadowDy: Int = 20,
+        shadowDx: Int = 10,
+        shadowDy: Int = 18,
         shadowRadius: Int = 16,
-        shadowAlpha: Float = 0.65f,
+        shadowAlpha: Float = 0.55f,
         outlineWidth: Int = 10,
-        outlineColor: Int = Color.WHITE,
-        bgColor: Int = Color.WHITE
+        outlineColor: Int = android.graphics.Color.WHITE,
+        bgColor: Int = android.graphics.Color.WHITE
     ): Bitmap {
         ensureNativeLoaded()
         val width = input.width
@@ -654,29 +546,74 @@ object ImageEnhancerNative {
         return try {
             val resultPixels = if (isNativeLibraryLoaded && mask.size == width * height) {
                 applyStudioShadowOutlineNative(
-                    inPixels,
-                    mask,
-                    width,
-                    height,
-                    outlineWidth,
-                    outlineColor,
-                    shadowDx,
-                    shadowDy,
-                    shadowRadius.toFloat(),
-                    bgColor
+                    inPixels, mask, width, height,
+                    outlineWidth, outlineColor, shadowDx, shadowDy,
+                    shadowRadius.toFloat(), shadowAlpha, bgColor
                 )
             } else null
 
             if (resultPixels != null && resultPixels.size == width * height) {
-                val outBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                outBitmap.setPixels(resultPixels, 0, width, 0, 0, width, height)
-                outBitmap
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+                    setPixels(resultPixels, 0, width, 0, 0, width, height)
+                }
             } else {
                 input.copy(Bitmap.Config.ARGB_8888, true)
             }
         } catch (t: Throwable) {
             Log.e(TAG, "studioShadowOutline error: ${t.message}", t)
             input
+        }
+    }
+
+    /**
+     * Exact linear-light JVM fallback so JVM unit tests verify physical exposure/WB math accurately.
+     */
+    private fun applyLinearColorJvmFallback(
+        src: Bitmap,
+        srcPixels: IntArray,
+        adj: ColorAdjustments
+    ): Bitmap {
+        val outPixels = IntArray(srcPixels.size)
+        val expGain = 2.0f.pow(adj.exposure)
+        var wbR = 2.0f.pow(adj.temp * 0.35f + adj.tint * 0.14f)
+        var wbG = 2.0f.pow(-adj.tint * 0.22f)
+        var wbB = 2.0f.pow(-adj.temp * 0.38f + adj.tint * 0.14f)
+        val norm = 1.0f / (0.2126f * wbR + 0.7152f * wbG + 0.0722f * wbB)
+        wbR *= norm; wbG *= norm; wbB *= norm
+
+        fun sToL(c: Float): Float = if (c <= 0.04045f) c / 12.92f else ((c + 0.055f) / 1.055f).pow(2.4f)
+        fun roll(x: Float): Float = if (x <= 0.85f) x.coerceAtLeast(0f) else 0.85f + 0.15f * (1f - exp(-(x - 0.85f) / 0.15f))
+        fun lToS(l: Float): Float {
+            val c = l.coerceIn(0f, 1f)
+            return if (c <= 0.0031308f) 12.92f * c else 1.055f * c.pow(1f / 2.4f) - 0.055f
+        }
+
+        for (i in srcPixels.indices) {
+            val p = srcPixels[i]
+            val a = (p ushr 24) and 0xFF
+            val rL = sToL(((p ushr 16) and 0xFF) / 255f) * expGain * wbR
+            val gL = sToL(((p ushr 8) and 0xFF) / 255f) * expGain * wbG
+            val bL = sToL((p and 0xFF) / 255f) * expGain * wbB
+
+            var r = lToS(roll(rL))
+            var g = lToS(roll(gL))
+            var b = lToS(roll(bL))
+
+            val lum = 0.2126f * r + 0.7152f * g + 0.0722f * b
+            val satF = (1f + adj.saturation).coerceAtLeast(0f)
+            r = (lum + (r - lum) * satF).coerceIn(0f, 1f)
+            g = (lum + (g - lum) * satF).coerceIn(0f, 1f)
+            b = (lum + (b - lum) * satF).coerceIn(0f, 1f)
+
+            outPixels[i] = (a shl 24) or
+                ((r * 255f + 0.5f).toInt().coerceIn(0, 255) shl 16) or
+                ((g * 255f + 0.5f).toInt().coerceIn(0, 255) shl 8) or
+                (b * 255f + 0.5f).toInt().coerceIn(0, 255)
+        }
+
+        return Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888).apply {
+            setHasAlpha(src.hasAlpha())
+            setPixels(outPixels, 0, src.width, 0, 0, src.width, src.height)
         }
     }
 }

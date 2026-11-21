@@ -20,20 +20,14 @@ object TileProcessor {
         val partialBitmap: Bitmap? = null
     )
 
-    /**
-     * Splits an input bitmap into overlapping tiles, processes each tile via ImageEnhancerNative,
-     * blends overlapping regions seamlessly with a persistent 2D Hann/cosine weight accumulator,
-     * and emits progress flows.
-     */
     fun processTiledFlow(
         input: Bitmap,
         mode: Int = ImageEnhancerNative.MODE_SUPER_RESOLUTION,
-        strength: Float = 0.8f,
+        strength: Float = 0.85f,
         tileSize: Int = DEFAULT_TILE_SIZE
     ): Flow<TileProgress> = flow {
         ImageEnhancerNative.ensureNativeLoaded()
 
-        // Restorasi Wajah & Potret requires full-face landmark context
         if (mode == ImageEnhancerNative.MODE_FACE_RESTORE) {
             emit(TileProgress(0, 2, 0.25f))
             val faceRestored = ImageEnhancerNative.restoreFaces(input, strength)
@@ -48,9 +42,8 @@ object TileProcessor {
         val width = safeInput.width
         val height = safeInput.height
 
-        // If image fits within a single tile, process directly
         if (width <= tileSize && height <= tileSize) {
-            emit(TileProgress(0, 1, 0.15f))
+            emit(TileProgress(0, 1, 0.2f))
             val result = ImageEnhancerNative.enhanceImage(safeInput, mode, strength)
             emit(TileProgress(1, 1, 1.0f, result))
             return@flow
@@ -61,7 +54,6 @@ object TileProcessor {
         val dstH = height * scale
 
         val targetPixels = IntArray(dstW * dstH)
-        // Persistent weight accumulator initialized to 0.0f across all tiles (fixes black halo/darkening bug)
         val weightMap = FloatArray(dstW * dstH)
 
         val step = (tileSize - (OVERLAP * 2)).coerceAtLeast(32)
@@ -74,7 +66,6 @@ object TileProcessor {
 
         val inPixels = IntArray(width * height)
         safeInput.getPixels(inPixels, 0, width, 0, 0, width, height)
-
         val overlapOutPx = OVERLAP * scale
 
         for (ty in 0 until tilesY) {
@@ -102,22 +93,15 @@ object TileProcessor {
                 val dstY = srcY * scale
 
                 val enhancedTilePixels = if (ImageEnhancerNative.isNativeLoaded()) {
-                    ImageEnhancerNative.processTileNative(
-                        tilePixels,
-                        currentTileW,
-                        currentTileH,
-                        mode,
-                        strength
-                    )
+                    ImageEnhancerNative.processTileNative(tilePixels, currentTileW, currentTileH, mode, strength)
                 } else {
-                    // JVM fallback for unit tests
                     if (scale > 1) {
                         val tileBmp = Bitmap.createBitmap(currentTileW, currentTileH, Bitmap.Config.ARGB_8888)
                         tileBmp.setPixels(tilePixels, 0, currentTileW, 0, 0, currentTileW, currentTileH)
                         val scaledBmp = Bitmap.createScaledBitmap(tileBmp, outTileW, outTileH, true)
-                        val outArr = IntArray(outTileW * outTileH)
-                        scaledBmp.getPixels(outArr, 0, outTileW, 0, 0, outTileW, outTileH)
-                        outArr
+                        IntArray(outTileW * outTileH).also {
+                            scaledBmp.getPixels(it, 0, outTileW, 0, 0, outTileW, outTileH)
+                        }
                     } else {
                         tilePixels
                     }
@@ -126,58 +110,32 @@ object TileProcessor {
                 if (enhancedTilePixels != null && enhancedTilePixels.size == outTileW * outTileH) {
                     if (ImageEnhancerNative.isNativeLoaded()) {
                         ImageEnhancerNative.blendTileWithWeightNative(
-                            enhancedTilePixels,
-                            targetPixels,
-                            weightMap,
-                            outTileW,
-                            outTileH,
-                            dstW,
-                            dstH,
-                            dstX,
-                            dstY,
-                            overlapOutPx
+                            enhancedTilePixels, targetPixels, weightMap,
+                            outTileW, outTileH, dstW, dstH, dstX, dstY, overlapOutPx
                         )
                     } else {
                         blendTileJvmFallback(
-                            enhancedTilePixels,
-                            targetPixels,
-                            weightMap,
-                            outTileW,
-                            outTileH,
-                            dstW,
-                            dstH,
-                            dstX,
-                            dstY,
-                            overlapOutPx
+                            enhancedTilePixels, targetPixels, weightMap,
+                            outTileW, outTileH, dstW, dstH, dstX, dstY, overlapOutPx
                         )
                     }
                 }
 
                 processedTiles++
-                val progress = processedTiles.toFloat() / totalTiles.toFloat()
-                emit(TileProgress(processedTiles, totalTiles, progress))
+                emit(TileProgress(processedTiles, totalTiles, processedTiles.toFloat() / totalTiles.toFloat()))
             }
         }
 
-        val outBitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
-        outBitmap.setPixels(targetPixels, 0, dstW, 0, 0, dstW, dstH)
+        val outBitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888).apply {
+            setPixels(targetPixels, 0, dstW, 0, 0, dstW, dstH)
+        }
         emit(TileProgress(totalTiles, totalTiles, 1.0f, outBitmap))
     }.flowOn(Dispatchers.Default)
 
-    /**
-     * Exact JVM mirror of C++ cosineTileBlendWithOverlap for unit test verification.
-     */
     private fun blendTileJvmFallback(
-        tilePixels: IntArray,
-        targetPixels: IntArray,
-        weightMap: FloatArray,
-        tileW: Int,
-        tileH: Int,
-        targetW: Int,
-        targetH: Int,
-        offsetX: Int,
-        offsetY: Int,
-        overlapPx: Int
+        tilePixels: IntArray, targetPixels: IntArray, weightMap: FloatArray,
+        tileW: Int, tileH: Int, targetW: Int, targetH: Int,
+        offsetX: Int, offsetY: Int, overlapPx: Int
     ) {
         val ramp = overlapPx.coerceIn(1, min(tileW, tileH) / 2)
         for (ty in 0 until tileH) {
@@ -216,12 +174,10 @@ object TileProcessor {
                     val dstPixel = targetPixels[targetIdx]
                     val totalW = existingW + w
                     val invTotal = 1.0f / totalW
-
                     val a = (((dstPixel ushr 24) and 0xFF) * existingW + ((tilePixel ushr 24) and 0xFF) * w) * invTotal
                     val r = (((dstPixel ushr 16) and 0xFF) * existingW + ((tilePixel ushr 16) and 0xFF) * w) * invTotal
                     val g = (((dstPixel ushr 8) and 0xFF) * existingW + ((tilePixel ushr 8) and 0xFF) * w) * invTotal
                     val b = ((dstPixel and 0xFF) * existingW + (tilePixel and 0xFF) * w) * invTotal
-
                     targetPixels[targetIdx] = (a.toInt().coerceIn(0, 255) shl 24) or
                         (r.toInt().coerceIn(0, 255) shl 16) or
                         (g.toInt().coerceIn(0, 255) shl 8) or

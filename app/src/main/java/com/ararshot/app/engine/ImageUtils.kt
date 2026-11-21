@@ -1,32 +1,58 @@
 package com.ararshot.app.engine
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
+import android.graphics.ImageDecoder
 import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.RadialGradient
-import android.graphics.Shader
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
+import com.ararshot.app.model.GalleryPhoto
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import kotlin.math.max
+import kotlin.math.min
 
 object ImageUtils {
-    private const val TAG = "ImageUtils"
+    private const val TAG = "ArArImageUtils"
 
     /**
-     * Loads a Bitmap from a Content/File URI with EXIF orientation auto-correction
-     * and high-resolution sampling up to maxDim (default 1536px).
+     * Loads a Bitmap from a Content/File URI with full HEIC/WebP/JPG/PNG support
+     * (via ImageDecoder on Android 9+ and BitmapFactory + EXIF fallback on older Android).
      */
-    fun loadBitmapFromUri(context: Context, uri: Uri, maxDim: Int = 1536): Bitmap {
+    fun loadBitmapFromUri(context: Context, uri: Uri, maxDim: Int = 2048): Bitmap {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                val source = ImageDecoder.createSource(context.contentResolver, uri)
+                return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    decoder.isMutableRequired = false
+                    val w = info.size.width
+                    val h = info.size.height
+                    val longest = max(w, h)
+                    if (longest > maxDim && maxDim > 0) {
+                        val ratio = maxDim.toFloat() / longest.toFloat()
+                        decoder.setTargetSize(
+                            max(1, (w * ratio).toInt()),
+                            max(1, (h * ratio).toInt())
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "ImageDecoder fallback to BitmapFactory: ${e.message}")
+            }
+        }
+
         val exifOrientation = try {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 ExifInterface(stream).getAttributeInt(
@@ -34,39 +60,42 @@ object ImageUtils {
                     ExifInterface.ORIENTATION_NORMAL
                 )
             } ?: ExifInterface.ORIENTATION_NORMAL
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             ExifInterface.ORIENTATION_NORMAL
         }
 
-        val inputStream1 = context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot open URI")
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeStream(inputStream1, null, options)
-        inputStream1.close()
+        context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, options)
+        } ?: throw IOException("Tidak dapat membuka file gambar")
 
         var inSampleSize = 1
-        val maxSide = maxOf(options.outWidth, options.outHeight)
+        val maxSide = max(options.outWidth, options.outHeight)
         while (maxSide / (inSampleSize * 2) >= maxDim) {
             inSampleSize *= 2
         }
 
-        val inputStream2 = context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot open URI")
         val decodeOptions = BitmapFactory.Options().apply {
             this.inSampleSize = inSampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        val decoded = BitmapFactory.decodeStream(inputStream2, null, decodeOptions) ?: throw IOException("Decode failed")
-        inputStream2.close()
+        val decoded = context.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, decodeOptions)
+        } ?: throw IOException("Gagal membaca file gambar")
 
         val oriented = applyExifOrientation(decoded, exifOrientation)
-
-        val currentMax = maxOf(oriented.width, oriented.height)
-        if (currentMax > maxDim) {
+        val currentMax = max(oriented.width, oriented.height)
+        return if (currentMax > maxDim) {
             val scale = maxDim.toFloat() / currentMax
-            val scaledW = (oriented.width * scale).toInt().coerceAtLeast(1)
-            val scaledH = (oriented.height * scale).toInt().coerceAtLeast(1)
-            return Bitmap.createScaledBitmap(oriented, scaledW, scaledH, true)
+            Bitmap.createScaledBitmap(
+                oriented,
+                max(1, (oriented.width * scale).toInt()),
+                max(1, (oriented.height * scale).toInt()),
+                true
+            )
+        } else {
+            oriented
         }
-        return oriented
     }
 
     private fun applyExifOrientation(bitmap: Bitmap, orientation: Int): Bitmap {
@@ -89,84 +118,45 @@ object ImageUtils {
         }
         return try {
             Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             bitmap
         }
     }
 
     /**
-     * Real-time hardware/canvas color grading applying exposure, contrast, saturation, temperature, and vignette.
+     * Queries recent photos from the device MediaStore for the Home quick gallery grid.
      */
-    fun applyColorGrading(
-        src: Bitmap,
-        exposure: Float = 0f,       // -100 to +100
-        contrast: Float = 1f,       // 0.5 to 2.0
-        saturation: Float = 1f,     // 0.0 to 2.0
-        temperature: Float = 0f,    // -50 (cool) to +50 (warm)
-        vignette: Float = 0f        // 0.0 to 1.0
-    ): Bitmap {
-        val result = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-        result.setHasAlpha(src.hasAlpha())
-        val canvas = Canvas(result)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-
-        val cm = ColorMatrix()
-
-        // 1. Saturation
-        val satMatrix = ColorMatrix()
-        satMatrix.setSaturation(saturation.coerceIn(0f, 3f))
-
-        // 2. Contrast & Exposure
-        val scale = contrast.coerceIn(0.2f, 3f)
-        val translate = exposure + (128f * (1f - scale))
-        val contrastMatrix = ColorMatrix(
-            floatArrayOf(
-                scale, 0f, 0f, 0f, translate,
-                0f, scale, 0f, 0f, translate,
-                0f, 0f, scale, 0f, translate,
-                0f, 0f, 0f, 1f, 0f
-            )
+    fun queryRecentPhotos(context: Context, limit: Int = 60): List<GalleryPhoto> {
+        val list = mutableListOf<GalleryPhoto>()
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.DATE_ADDED
         )
-
-        // 3. Temperature (warm = more red/yellow, cool = more blue)
-        val tempR = if (temperature > 0) temperature * 0.8f else 0f
-        val tempB = if (temperature < 0) -temperature * 0.8f else 0f
-        val tempMatrix = ColorMatrix(
-            floatArrayOf(
-                1f, 0f, 0f, 0f, tempR,
-                0f, 1f, 0f, 0f, tempR * 0.4f,
-                0f, 0f, 1f, 0f, tempB,
-                0f, 0f, 0f, 1f, 0f
-            )
-        )
-
-        cm.postConcat(satMatrix)
-        cm.postConcat(contrastMatrix)
-        cm.postConcat(tempMatrix)
-
-        paint.colorFilter = ColorMatrixColorFilter(cm)
-        canvas.drawBitmap(src, 0f, 0f, paint)
-
-        // 4. Vignette effect
-        if (vignette > 0.05f) {
-            val w = src.width.toFloat()
-            val h = src.height.toFloat()
-            val radius = maxOf(w, h) * 0.75f
-            val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            val colors = intArrayOf(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.argb((vignette.coerceIn(0f, 1f) * 200).toInt(), 0, 0, 0)
-            )
-            val stops = floatArrayOf(0.4f, 1.0f)
-            vignettePaint.shader = RadialGradient(
-                w / 2f, h / 2f, radius,
-                colors, stops,
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(0f, 0f, w, h, vignettePaint)
+        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        try {
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                null,
+                null,
+                sortOrder
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                while (cursor.moveToNext() && list.size < limit) {
+                    val id = cursor.getLong(idCol)
+                    val name = cursor.getString(nameCol) ?: "Foto"
+                    val date = cursor.getLong(dateCol)
+                    val uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                    list.add(GalleryPhoto(id = id, uri = uri, displayName = name, dateAddedSec = date))
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "queryRecentPhotos skipped: ${e.message}")
         }
-
-        return result
+        return list
     }
 
     fun rotateBitmap(src: Bitmap, degrees: Float): Bitmap {
@@ -176,12 +166,49 @@ object ImageUtils {
 
     fun flipBitmap(src: Bitmap, horizontal: Boolean, vertical: Boolean): Bitmap {
         val matrix = Matrix().apply {
-            postScale(
-                if (horizontal) -1f else 1f,
-                if (vertical) -1f else 1f
-            )
+            postScale(if (horizontal) -1f else 1f, if (vertical) -1f else 1f)
         }
         return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+    }
+
+    /**
+     * Applies straightened rotation (auto-zoomed to avoid black corner triangles) and normalized crop rect [0..1].
+     */
+    fun cropAndStraighten(src: Bitmap, cropNormalized: RectF, straightenDegrees: Float): Bitmap {
+        var working = src
+        if (kotlin.math.abs(straightenDegrees) > 0.05f) {
+            val rad = Math.toRadians(kotlin.math.abs(straightenDegrees.toDouble()))
+            val w = src.width.toDouble()
+            val h = src.height.toDouble()
+            val cosA = kotlin.math.cos(rad)
+            val sinA = kotlin.math.sin(rad)
+            // Compute largest inscribed rectangle scale to eliminate black corners
+            val scale = max(
+                (w * cosA + h * sinA) / w,
+                (h * cosA + w * sinA) / h
+            ).toFloat()
+
+            val rotated = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(rotated)
+            val matrix = Matrix().apply {
+                postTranslate(-src.width / 2f, -src.height / 2f)
+                postRotate(straightenDegrees)
+                postScale(scale, scale)
+                postTranslate(src.width / 2f, src.height / 2f)
+            }
+            canvas.drawBitmap(src, matrix, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+            working = rotated
+        }
+
+        val left = (cropNormalized.left.coerceIn(0f, 0.95f) * working.width).toInt()
+        val top = (cropNormalized.top.coerceIn(0f, 0.95f) * working.height).toInt()
+        val right = (cropNormalized.right.coerceIn(0.05f, 1f) * working.width).toInt()
+        val bottom = (cropNormalized.bottom.coerceIn(0.05f, 1f) * working.height).toInt()
+        val cw = (right - left).coerceIn(1, working.width - left)
+        val ch = (bottom - top).coerceIn(1, working.height - top)
+
+        if (left == 0 && top == 0 && cw == working.width && ch == working.height) return working
+        return Bitmap.createBitmap(working, left, top, cw, ch)
     }
 
     fun cropToAspectRatio(src: Bitmap, aspectX: Int, aspectY: Int): Bitmap {
@@ -189,10 +216,8 @@ object ImageUtils {
         val srcH = src.height
         val targetRatio = aspectX.toFloat() / aspectY.toFloat()
         val srcRatio = srcW.toFloat() / srcH.toFloat()
-
         val cropW: Int
         val cropH: Int
-
         if (srcRatio > targetRatio) {
             cropH = srcH
             cropW = (srcH * targetRatio).toInt()
@@ -200,22 +225,29 @@ object ImageUtils {
             cropW = srcW
             cropH = (srcW / targetRatio).toInt()
         }
-
-        val startX = (srcW - cropW) / 2
-        val startY = (srcH - cropH) / 2
-
-        return Bitmap.createBitmap(src, startX, startY, cropW, cropH)
+        val startX = ((srcW - cropW) / 2).coerceAtLeast(0)
+        val startY = ((srcH - cropH) / 2).coerceAtLeast(0)
+        return Bitmap.createBitmap(src, startX, startY, cropW.coerceAtMost(srcW), cropH.coerceAtMost(srcH))
     }
 
-    /**
-     * Checks whether the bitmap contains transparent pixels (e.g., from PNG background cutout).
-     */
+    fun resizeToMaxEdge(src: Bitmap, maxEdgePx: Int): Bitmap {
+        val longest = max(src.width, src.height)
+        if (longest <= maxEdgePx || maxEdgePx <= 0) return src
+        val ratio = maxEdgePx.toFloat() / longest.toFloat()
+        return Bitmap.createScaledBitmap(
+            src,
+            max(1, (src.width * ratio).toInt()),
+            max(1, (src.height * ratio).toInt()),
+            true
+        )
+    }
+
     fun hasTransparency(bitmap: Bitmap): Boolean {
         if (!bitmap.hasAlpha()) return false
         val w = bitmap.width
         val h = bitmap.height
-        val stepX = (w / 16).coerceAtLeast(1)
-        val stepY = (h / 16).coerceAtLeast(1)
+        val stepX = max(1, w / 16)
+        val stepY = max(1, h / 16)
         for (y in 0 until h step stepY) {
             for (x in 0 until w step stepX) {
                 val alpha = (bitmap.getPixel(x, y) ushr 24) and 0xFF
@@ -225,22 +257,19 @@ object ImageUtils {
         return false
     }
 
-    /**
-     * Saves high-res bitmap to MediaStore gallery.
-     * Automatically exports lossless PNG when transparency is present, or 98%-quality JPEG otherwise.
-     */
     fun saveBitmapToGallery(
         context: Context,
         bitmap: Bitmap,
         title: String = "ArArShot_${System.currentTimeMillis()}",
-        forcePng: Boolean = false
+        forcePng: Boolean = false,
+        jpegQuality: Int = 95
     ): Boolean {
         return try {
             val isTransparent = forcePng || hasTransparency(bitmap)
             val ext = if (isTransparent) "png" else "jpg"
             val mimeType = if (isTransparent) "image/png" else "image/jpeg"
-            val compressFormat = if (isTransparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
-            val quality = if (isTransparent) 100 else 98
+            val format = if (isTransparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+            val quality = if (isTransparent) 100 else jpegQuality.coerceIn(70, 100)
 
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, "$title.$ext")
@@ -254,7 +283,7 @@ object ImageUtils {
             val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
             if (uri != null) {
                 resolver.openOutputStream(uri)?.use { out ->
-                    bitmap.compress(compressFormat, quality, out)
+                    bitmap.compress(format, quality, out)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     contentValues.clear()
@@ -266,15 +295,33 @@ object ImageUtils {
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save bitmap to gallery: ${e.message}", e)
+            Log.e(TAG, "saveBitmapToGallery error: ${e.message}", e)
             false
         }
     }
 
-    /**
-     * Stamps an authentic vintage digicam 90s/2000s LCD orange date stamp ('98 10 14)
-     * in the lower-right corner with realistic phosphor glow.
-     */
+    fun createShareableUri(context: Context, bitmap: Bitmap, forcePng: Boolean = false): Uri? {
+        return try {
+            val isTransparent = forcePng || hasTransparency(bitmap)
+            val ext = if (isTransparent) "png" else "jpg"
+            val format = if (isTransparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+            val dir = File(context.cacheDir, "share").apply { mkdirs() }
+            val outFile = File(dir, "ArArShot_${System.currentTimeMillis()}.$ext")
+            FileOutputStream(outFile).use { bitmap.compress(format, if (isTransparent) 100 else 95, it) }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", outFile)
+        } catch (e: Exception) {
+            Log.e(TAG, "createShareableUri error: ${e.message}", e)
+            null
+        }
+    }
+
+    fun createCameraOutputUri(context: Context): Pair<File, Uri> {
+        val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+        val file = File(dir, "CAP_${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        return file to uri
+    }
+
     fun addRetroDateStamp(
         source: Bitmap,
         dateText: String = "'98 10 14",
@@ -284,32 +331,26 @@ object ImageUtils {
         val canvas = Canvas(result)
         val width = result.width.toFloat()
         val height = result.height.toFloat()
-
-        val fontSize = (width * 0.042f).coerceIn(24f, 84f)
+        val fontSize = (min(width, height) * 0.042f).coerceIn(22f, 80f)
         val marginX = width * 0.05f
         val marginY = height * 0.05f
 
-        val paintGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val paintGlow = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             this.color = color
             textSize = fontSize
             typeface = android.graphics.Typeface.MONOSPACE
-            textAlign = Paint.Align.RIGHT
+            textAlign = android.graphics.Paint.Align.RIGHT
             setShadowLayer(fontSize * 0.35f, 0f, 0f, color)
         }
-
-        val paintText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val paintText = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             this.color = android.graphics.Color.WHITE
             textSize = fontSize
             typeface = android.graphics.Typeface.MONOSPACE
-            textAlign = Paint.Align.RIGHT
+            textAlign = android.graphics.Paint.Align.RIGHT
         }
 
-        val x = width - marginX
-        val y = height - marginY
-
-        canvas.drawText(dateText, x, y, paintGlow)
-        canvas.drawText(dateText, x, y, paintText)
-
+        canvas.drawText(dateText, width - marginX, height - marginY, paintGlow)
+        canvas.drawText(dateText, width - marginX, height - marginY, paintText)
         return result
     }
 }

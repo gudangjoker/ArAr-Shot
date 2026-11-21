@@ -1,60 +1,24 @@
-# 📷 ArAr Shot
+# ArAr Shot
 
-[![Android Build](https://github.com/gudangjoker/ArAr-Shot/actions/workflows/android-build.yml/badge.svg)](https://github.com/gudangjoker/ArAr-Shot/actions/workflows/android-build.yml)
-![Android Min SDK](https://img.shields.io/badge/Min%20SDK-24%20(Android%207.0)-blue)
-![Android Target SDK](https://img.shields.io/badge/Target%20SDK-34%20(Android%2014)-green)
-![Release](https://img.shields.io/badge/Release-v2.0.1-purple)
-![Privasi](https://img.shields.io/badge/Privasi-100%25%20Offline-success)
+Aplikasi editor foto native Android (Kotlin, Jetpack Compose, C++17 & NCNN) yang dirancang bersih, cepat, dan nyaman untuk kebutuhan dokumentasi pribadi maupun upload media sosial.
 
-Aplikasi editor foto Android yang berjalan 100% secara luring (tanpa internet) menggunakan pemrosesan native C++17 dan model neural NCNN on-device.
+## Fitur Utama
 
----
+- **Sesuaikan (Linear-Light):** Otomatis (Auto Enhance), Pencahayaan (EV + *highlight roll-off*), Kontras, Sorotan & Bayangan (*edge-aware*), Putih, Hitam, Suhu & Rona (*chromatic white balance*), Vibrance, Saturasi, **HSL 8-Warna**, Kejernihan, Ketajaman, Vinyet, Grain Film, Fade, dan Halation.
+- **Filter:** 12 preset warna terkurasi dengan pratinjau langsung pada foto dan slider intensitas.
+- **Potong & Luruskan:** Kotak potong interaktif langsung di foto, pelurusan sudut (±45°), putar, balik, serta rasio cepat sosial media (`4:5 IG`, `1:1`, `9:16`, `16:9`, `3:2`).
+- **Tingkatkan:** Anti-Noise, Perjelas Wajah, Tajamkan, dan Resolusi 4X (Real-ESRGAN NCNN).
+- **Hapus & Ganti Latar:** Pemisahan subjek umum (manusia, produk, hewan) menggunakan Google ML Kit Subject Segmentation dipadukan dengan MODNet & Guided Filter untuk tepian halus, ekspor PNG transparan, warna polos, gradasi, blur, bayangan, hingga stiker.
+- **Blur & Pencahayaan:** Efek blur latar berbasis kedalaman (`dpt256`) di ruang *linear light* serta penyesuaian arah cahaya.
+- **Hapus Objek:** Kuas penanda untuk menghilangkan noda atau objek pengganggu.
+- **Gaya Anime:** Transformasi potret ke gaya Anime Halus, Ilustrasi, atau Sketsa dengan *letterbox padding* menjaga proporsi wajah.
+- **Teks, Kolase & Pasfoto:** Tambah teks (termasuk di belakang subjek), kolase 2–4 foto, dan pasfoto ukuran `2×3`, `3×4`, `4×6`, `2×2` lengkap dengan lembar cetak 4R.
+- **Simpan & Bagikan:** Pilihan ukuran (`Asli`, `Optimal Sosmed 1440 px`, `Ringan 1080 px`), format JPG/PNG, serta tombol Bagikan langsung.
 
-## 📱 Fitur Utama
-
-- **Restorasi Wajah & Resolusi 4X**: Memperjelas area wajah pada foto buram menggunakan deteksi wajah SCRFD dan perbesaran Real-ESRGAN.
-- **Hapus Objek**: Menghapus objek pengganggu atau noda pada foto menggunakan kuas usap inpainting.
-- **Efek Bokeh & Pencahayaan 3D**: Menghasilkan efek blur latar belakang dan simulasi pencahayaan berbasis estimasi kedalaman (Depth Anything).
-- **Hapus Latar Belakang**: Memisahkan subjek dari latar belakang dengan deteksi MODNet dan ML Kit, mendukung ekspor PNG transparan, ganti warna studio, bayangan 3D, atau garis tepi stiker.
-- **Pewarnaan Foto Lawas**: Memberikan warna alami pada foto hitam-putih kenangan pada ruang warna CIE LAB.
-- **Gaya Anime**: Mengubah potret menjadi ilustrasi gaya anime menggunakan model AnimeGANv2.
-- **Pasfoto Resmi**: Pengaturan pasfoto ukuran standar (2x3, 3x4, 4x6, visa) dengan latar belakang merah/biru resmi serta penyusunan lembar cetak 4R.
-- **Kamera Lawas CCD**: Filter bernuansa kamera saku 2000-an dengan pendaran cahaya (halation), bintik film analog, dan cap tanggal.
-- **Teks & Tipografi**: Menambahkan tulisan dengan pilihan gaya (neon, bayangan, garis tepi stiker) serta fitur teks di belakang subjek.
-- **Studio Kolase**: Menggabungkan 2 hingga 4 foto dengan pengaturan jarak antarfoto dan kelengkungan sudut.
-- **Koreksi Warna & Transformasi**: Pengaturan pencahayaan, kontras, saturasi, suhu warna, vinyet, rotasi, dan pemotongan rasio aspek.
-
----
-
-## 🔒 Privasi & Keamanan
-
-- **100% Offline**: Aplikasi tidak memerlukan dan tidak meminta izin internet (`android.permission.INTERNET` tidak disertakan di manifest).
-- **Pemrosesan Lokal**: Seluruh pemrosesan foto dan model AI berjalan langsung di ponsel pengguna.
-- **Tanpa Telemetri**: Tidak ada pelacakan, analitik, atau pengumpulan data pengguna.
-
----
-
-## 🧠 Model Neural yang Digunakan (`app/src/main/assets/models/`)
-
-Aplikasi menggunakan model neural open-source yang dioptimasi untuk NCNN:
-- `scrfd_500m_kps-opt2`: Deteksi wajah dan titik landmark anatomis.
-- `realesr-general-x4v3` & `realesr-general-wdn-x4v3`: Perbesaran resolusi 4X dan pengurangan bintik/noise.
-- `modnet_matting`: Pemisahan helai rambut dan tepian subjek.
-- `dpt256`: Estimasi kedalaman monokular untuk efek bokeh dan pencahayaan.
-- `face_paint_512_v2`: Transfer gaya ilustrasi anime.
-
----
-
-## 🛠️ Kompilasi & Build Lokal
+## Build Lokal
 
 ```bash
-# 1. Siapkan NCNN Android SDK:
-./setup_ncnn.sh        # Linux / macOS
-.\setup_ncnn.ps1       # Windows PowerShell
-
-# 2. Jalankan Pengujian Unit:
+./setup_ncnn.sh
 ./gradlew testDebugUnitTest
-
-# 3. Kompilasi APK:
-./gradlew assembleRelease assembleDebug
+./gradlew assembleDebug assembleRelease
 ```

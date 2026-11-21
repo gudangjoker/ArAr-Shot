@@ -27,12 +27,13 @@
 #endif
 #endif
 
-// Mode definitions
+// Enhance mode constants
 #define MODE_SUPER_RESOLUTION  0
 #define MODE_BILATERAL_DENOISE 1
 #define MODE_UNSHARP_MASK      2
 #define MODE_COMBINED_ENHANCE  3
 #define MODE_FACE_RESTORE      4
+#define MODE_DENOISE_ONLY      5
 
 struct DetectedFace {
     float x;
@@ -40,39 +41,58 @@ struct DetectedFace {
     float w;
     float h;
     float score;
-    float landmarks[10]; // 5 points: (x0,y0), (x1,y1), (x2,y2), (x3,y3), (x4,y4)
+    float landmarks[10]; // 5 points: (lEye, rEye, nose, lMouth, rMouth)
 };
 
-// Native mathematical and hybrid AI enhancement functions
+// Packed Linear-Light Color & Filter Pipeline Parameters (42 floats)
+// [0]  exposure (-2..+2 EV)
+// [1]  contrast (-1..+1)
+// [2]  highlights (-1..+1)
+// [3]  shadows (-1..+1)
+// [4]  whites (-1..+1)
+// [5]  blacks (-1..+1)
+// [6]  temp (-1..+1)
+// [7]  tint (-1..+1)
+// [8]  vibrance (-1..+1)
+// [9]  saturation (-1..+1)
+// [10] clarity (-1..+1)
+// [11] sharpen (0..1)
+// [12] fade (0..1)
+// [13] vignette (-1..+1)
+// [14] grain (0..1)
+// [15] halation (0..1)
+// [16] presetId (0 = None, 1..12 = Curated looks)
+// [17] presetStrength (0..1)
+// [18..25] hslHue[8] (-1..+1)
+// [26..33] hslSat[8] (-1..+1)
+// [34..41] hslLum[8] (-1..+1)
+constexpr int COLOR_PARAMS_COUNT = 42;
+
+// Core C++17 image processing functions (ARGB_8888: 0xAARRGGBB)
+void applyLinearColorPipeline(const uint32_t* src, uint32_t* dst, int width, int height, const float* params);
+void analyzeAutoEnhance(const uint32_t* src, int width, int height, float* outParams);
+
 void unsharpMask(const uint32_t* src, uint32_t* dst, int width, int height, float amount, float radius);
 void bilateralDenoise(const uint32_t* src, uint32_t* dst, int width, int height, float spatialSigma, float colorSigma);
 void superResolutionFallback(const uint32_t* src, uint32_t* dst, int srcW, int srcH, int scale, float sharpenAmount);
 void cosineTileBlendWithOverlap(const uint32_t* tile, int tileW, int tileH, int dstX, int dstY,
                                 uint32_t* target, float* weightMap, int targetW, int targetH, int overlapPx);
-void cosineTileBlend(const uint32_t* tile, int tileW, int tileH, int dstX, int dstY,
-                     uint32_t* target, float* weightMap, int targetW, int targetH);
 
-// Face Detection & Blind Face Restoration Pipeline
 std::vector<DetectedFace> detectFacesInternal(const uint32_t* src, int width, int height);
 void restoreFacesNeural(const uint32_t* src, uint32_t* dst, int width, int height, float fidelityStrength);
 
-// Guided Alpha Matting & Monocular 3D Depth Estimation
-void extractAlphaMatteInternal(const uint32_t* src, const float* coarseMask, float* outAlpha, int width, int height);
+void extractAlphaMatteInternal(const uint32_t* src, const float* coarseMask, float* outAlpha, int width, int height, bool isPortraitHint);
 void estimateDepthMapInternal(const uint32_t* src, const float* subjectMask, float* outDepth, int width, int height);
 
-// 7 Viral AI Engine Native Algorithms
 void teleaInpaint(const uint32_t* src, const int32_t* mask, uint32_t* dst, int width, int height, int radius);
-void depthBokeh(const uint32_t* src, const float* depthMask, uint32_t* dst, int width, int height, float maxBlurRadius, float focusDepth);
+void depthBokehLinear(const uint32_t* src, const float* depthMask, uint32_t* dst, int width, int height, float maxBlurRadius, float focusDepth);
 void relighting3D(const uint32_t* src, const float* depthMask, uint32_t* dst, int width, int height,
                   float lightX, float lightY, float lightZ,
                   float lightR, float lightG, float lightB, float intensity);
-void vintageHalation(const uint32_t* src, uint32_t* dst, int width, int height,
-                     float halationStrength, float grainAmount, float vignetteStrength);
-void animeCelShade(const uint32_t* src, uint32_t* dst, int width, int height, int quantLevels, float edgeThreshold);
-void colorizeGrayscale(const uint32_t* src, uint32_t* dst, int width, int height, float saturation);
+void animeStylize(const uint32_t* src, uint32_t* dst, int width, int height, int styleMode, float strength);
 void studioShadowOutline(const uint32_t* src, const float* mask, uint32_t* dst, int width, int height,
                          int outlineWidth, uint32_t outlineColor,
-                         int shadowOffsetX, int shadowOffsetY, float shadowBlur, uint32_t bgColor);
+                         int shadowOffsetX, int shadowOffsetY, float shadowBlur, float shadowAlpha, uint32_t bgColor);
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,115 +101,62 @@ extern "C" {
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved);
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* reserved);
 
-// JNI signatures for com.ararshot.app.engine.ImageEnhancerNative
 JNIEXPORT jboolean JNICALL
-Java_com_ararshot_app_engine_ImageEnhancerNative_loadModelNative(
-    JNIEnv* env,
-    jobject thiz,
-    jobject assetManager,
-    jstring paramPath,
-    jstring binPath
+Java_com_ararshot_app_engine_ImageEnhancerNative_initAssetManagerNative(
+    JNIEnv* env, jobject thiz, jobject assetManager
 );
 
-JNIEXPORT jboolean JNICALL
-Java_com_ararshot_app_engine_ImageEnhancerNative_initAllModelsNative(
-    JNIEnv* env,
-    jobject thiz,
-    jobject assetManager
+JNIEXPORT void JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_releaseModelsNative(
+    JNIEnv* env, jobject thiz
+);
+
+JNIEXPORT jintArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_applyLinearColorNative(
+    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height, jfloatArray params
+);
+
+JNIEXPORT jfloatArray JNICALL
+Java_com_ararshot_app_engine_ImageEnhancerNative_analyzeAutoEnhanceNative(
+    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height
 );
 
 JNIEXPORT jintArray JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_processTileNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray inputPixels,
-    jint tileW,
-    jint tileH,
-    jint mode,
-    jfloat strength
+    JNIEnv* env, jobject thiz, jintArray inputPixels, jint tileW, jint tileH, jint mode, jfloat strength
 );
 
 JNIEXPORT jboolean JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_processBitmapNative(
-    JNIEnv* env,
-    jobject thiz,
-    jobject inputBitmap,
-    jobject outputBitmap,
-    jint mode,
-    jfloat strength
-);
-
-JNIEXPORT void JNICALL
-Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray tilePixels,
-    jintArray targetPixels,
-    jint tileW,
-    jint tileH,
-    jint targetW,
-    jint targetH,
-    jint offsetX,
-    jint offsetY,
-    jint overlapPx
+    JNIEnv* env, jobject thiz, jobject inputBitmap, jobject outputBitmap, jint mode, jfloat strength
 );
 
 JNIEXPORT void JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_blendTileWithWeightNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray tilePixels,
-    jintArray targetPixels,
-    jfloatArray weightMap,
-    jint tileW,
-    jint tileH,
-    jint targetW,
-    jint targetH,
-    jint offsetX,
-    jint offsetY,
-    jint overlapPx
+    JNIEnv* env, jobject thiz, jintArray tilePixels, jintArray targetPixels, jfloatArray weightMap,
+    jint tileW, jint tileH, jint targetW, jint targetH, jint offsetX, jint offsetY, jint overlapPx
 );
 
 JNIEXPORT jfloatArray JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_detectFacesNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray srcPixels,
-    jint width,
-    jint height
+    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height
 );
 
 JNIEXPORT jintArray JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_restoreFacesNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray srcPixels,
-    jint width,
-    jint height,
-    jfloat strength
+    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height, jfloat strength
 );
 
 JNIEXPORT jfloatArray JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_extractAlphaMatteNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray srcPixels,
-    jfloatArray coarseMask,
-    jint width,
-    jint height
+    JNIEnv* env, jobject thiz, jintArray srcPixels, jfloatArray coarseMask, jint width, jint height, jboolean isPortraitHint
 );
 
 JNIEXPORT jfloatArray JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_estimateDepthNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray srcPixels,
-    jfloatArray subjectMask,
-    jint width,
-    jint height
+    JNIEnv* env, jobject thiz, jintArray srcPixels, jfloatArray subjectMask, jint width, jint height
 );
 
-// JNI signatures for 7 Viral AI Engine features (com.ararshot.app.engine.ImageEnhancerNative)
 JNIEXPORT jintArray JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_inpaintNative(
     JNIEnv* env, jobject thiz, jintArray srcPixels, jintArray maskPixels, jint width, jint height, jint radius
@@ -207,70 +174,15 @@ Java_com_ararshot_app_engine_ImageEnhancerNative_applyRelightingNative(
 );
 
 JNIEXPORT jintArray JNICALL
-Java_com_ararshot_app_engine_ImageEnhancerNative_applyHalationNative(
-    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height, jfloat halationStrength, jfloat grainAmount, jfloat vignetteStrength
-);
-
-JNIEXPORT jintArray JNICALL
-Java_com_ararshot_app_engine_ImageEnhancerNative_applyAnimeFilterNative(
-    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height, jint quantLevels, jfloat edgeThreshold
-);
-
-JNIEXPORT jintArray JNICALL
-Java_com_ararshot_app_engine_ImageEnhancerNative_colorizeImageNative(
-    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height, jfloat saturation
+Java_com_ararshot_app_engine_ImageEnhancerNative_applyAnimeStylizeNative(
+    JNIEnv* env, jobject thiz, jintArray srcPixels, jint width, jint height, jint styleMode, jfloat strength
 );
 
 JNIEXPORT jintArray JNICALL
 Java_com_ararshot_app_engine_ImageEnhancerNative_applyStudioShadowOutlineNative(
     JNIEnv* env, jobject thiz, jintArray srcPixels, jfloatArray mask, jint width, jint height,
-    jint outlineWidth, jint outlineColor, jint shadowOffsetX, jint shadowOffsetY, jfloat shadowBlur, jint bgColor
-);
-
-// Backward-compatible signatures for com.example.engine.ImageEnhancerNative
-JNIEXPORT jboolean JNICALL
-Java_com_example_engine_ImageEnhancerNative_loadModelNative(
-    JNIEnv* env,
-    jobject thiz,
-    jobject assetManager,
-    jstring paramPath,
-    jstring binPath
-);
-
-JNIEXPORT jintArray JNICALL
-Java_com_example_engine_ImageEnhancerNative_processTileNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray inputPixels,
-    jint tileW,
-    jint tileH,
-    jint mode,
-    jfloat strength
-);
-
-JNIEXPORT jboolean JNICALL
-Java_com_example_engine_ImageEnhancerNative_processBitmapNative(
-    JNIEnv* env,
-    jobject thiz,
-    jobject inputBitmap,
-    jobject outputBitmap,
-    jint mode,
-    jfloat strength
-);
-
-JNIEXPORT void JNICALL
-Java_com_example_engine_ImageEnhancerNative_blendTileNative(
-    JNIEnv* env,
-    jobject thiz,
-    jintArray tilePixels,
-    jintArray targetPixels,
-    jint tileW,
-    jint tileH,
-    jint targetW,
-    jint targetH,
-    jint offsetX,
-    jint offsetY,
-    jint overlapPx
+    jint outlineWidth, jint outlineColor, jint shadowOffsetX, jint shadowOffsetY,
+    jfloat shadowBlur, jfloat shadowAlpha, jint bgColor
 );
 
 #ifdef __cplusplus

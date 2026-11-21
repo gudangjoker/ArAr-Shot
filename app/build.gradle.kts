@@ -6,20 +6,20 @@ plugins {
 }
 
 base {
-    archivesName.set("ArAr-Shot-v2.0.1")
+    archivesName.set("ArAr-Shot-v3.0.0")
 }
 
 android {
     namespace = "com.ararshot.app"
-    compileSdk = 34
+    compileSdk = 35
     ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.ararshot.app"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 9
-        versionName = "2.0.1"
+        targetSdk = 35
+        versionCode = 10
+        versionName = "3.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -100,7 +100,11 @@ android {
         buildConfig = true
     }
 
-    testOptions { unitTests { isIncludeAndroidResources = true } }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -122,7 +126,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+
+    // Google ML Kit Subject Segmentation (people, pets, products, general objects)
+    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
 
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.core)

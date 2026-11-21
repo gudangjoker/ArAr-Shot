@@ -9,37 +9,35 @@ import android.graphics.RectF
 import android.graphics.Typeface
 
 enum class TextFontFamily(val displayName: String, val typeface: Typeface) {
-    SANS_SERIF("Sans Modern", Typeface.SANS_SERIF),
-    SERIF("Serif Klasik", Typeface.SERIF),
-    MONOSPACE("Monospace Tebal", Typeface.MONOSPACE),
-    BOLD_IMPACT("Tebal Tegas (Impact)", Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)),
-    CURSIVE("Kaligrafi Elegan", Typeface.create("cursive", Typeface.BOLD_ITALIC))
+    SANS_SERIF("Modern", Typeface.SANS_SERIF),
+    BOLD_IMPACT("Tebal", Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)),
+    SERIF("Klasik", Typeface.SERIF),
+    MONOSPACE("Mono", Typeface.MONOSPACE),
+    CURSIVE("Skrip", Typeface.create("cursive", Typeface.BOLD_ITALIC))
 }
 
 enum class TextStyleModel(val displayName: String) {
-    CLEAN("Bersih Minimalis"),
-    SHADOW_3D("Bayangan 3D Dalam"),
-    NEON_GLOW("Kilau Neon Menyala"),
-    OUTLINE_STROKE("Garis Tepi Stiker"),
-    BADGE_PILL("Kotak Lencana (Badge)")
+    CLEAN("Polos"),
+    SHADOW_3D("Bayangan"),
+    OUTLINE_STROKE("Garis Tepi"),
+    BADGE_PILL("Latar Pil"),
+    NEON_GLOW("Pendar")
 }
 
 data class TextOverlayConfig(
-    val text: String = "ArAr Shot Pro",
+    val text: String = "",
     val font: TextFontFamily = TextFontFamily.BOLD_IMPACT,
-    val styleModel: TextStyleModel = TextStyleModel.NEON_GLOW,
+    val styleModel: TextStyleModel = TextStyleModel.CLEAN,
     val textColor: Int = Color.WHITE,
-    val accentColor: Int = Color.CYAN,
-    val fontSizeSp: Float = 36f,
+    val accentColor: Int = Color.BLACK,
+    val fontSizeSp: Float = 32f,
     val positionXFraction: Float = 0.5f,
-    val positionYFraction: Float = 0.8f,
-    val rotationDegrees: Float = 0f
+    val positionYFraction: Float = 0.82f,
+    val rotationDegrees: Float = 0f,
+    val behindSubject: Boolean = false
 )
 
 object TextStyler {
-    /**
-     * Burns styled text onto target bitmap and returns composite result.
-     */
     fun drawTextOnBitmap(source: Bitmap, config: TextOverlayConfig): Bitmap {
         if (config.text.isBlank()) return source
 
@@ -70,55 +68,49 @@ object TextStyler {
             }
             TextStyleModel.SHADOW_3D -> {
                 val shadowPaint = Paint(textPaint).apply {
-                    color = Color.argb(180, 0, 0, 0)
-                    setShadowLayer(16f, 8f, 8f, Color.BLACK)
+                    color = Color.argb(175, 0, 0, 0)
+                    setShadowLayer(14f, 6f, 6f, Color.BLACK)
                 }
                 canvas.drawText(config.text, posX, posY, shadowPaint)
-
                 textPaint.color = config.textColor
                 canvas.drawText(config.text, posX, posY, textPaint)
             }
             TextStyleModel.NEON_GLOW -> {
                 val glowPaint = Paint(textPaint).apply {
                     color = config.accentColor
-                    setShadowLayer(26f, 0f, 0f, config.accentColor)
+                    setShadowLayer(24f, 0f, 0f, config.accentColor)
                 }
                 canvas.drawText(config.text, posX, posY, glowPaint)
-
                 textPaint.color = Color.WHITE
                 canvas.drawText(config.text, posX, posY, textPaint)
             }
             TextStyleModel.OUTLINE_STROKE -> {
                 val outlinePaint = Paint(textPaint).apply {
                     style = Paint.Style.STROKE
-                    strokeWidth = textPaint.textSize * 0.16f
+                    strokeWidth = textPaint.textSize * 0.14f
                     color = config.accentColor
                     strokeJoin = Paint.Join.ROUND
                     strokeCap = Paint.Cap.ROUND
                 }
                 canvas.drawText(config.text, posX, posY, outlinePaint)
-
                 textPaint.color = config.textColor
                 textPaint.style = Paint.Style.FILL
                 canvas.drawText(config.text, posX, posY, textPaint)
             }
             TextStyleModel.BADGE_PILL -> {
-                val paddingX = textPaint.textSize * 0.4f
-                val paddingY = textPaint.textSize * 0.25f
-
+                val paddingX = textPaint.textSize * 0.42f
+                val paddingY = textPaint.textSize * 0.26f
                 val rectF = RectF(
                     posX - (bounds.width() / 2f) - paddingX,
                     posY + bounds.top - paddingY,
                     posX + (bounds.width() / 2f) + paddingX,
                     posY + bounds.bottom + paddingY
                 )
-
                 val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = config.accentColor
                     style = Paint.Style.FILL
                 }
-                canvas.drawRoundRect(rectF, textPaint.textSize * 0.3f, textPaint.textSize * 0.3f, badgePaint)
-
+                canvas.drawRoundRect(rectF, textPaint.textSize * 0.32f, textPaint.textSize * 0.32f, badgePaint)
                 textPaint.color = config.textColor
                 canvas.drawText(config.text, posX, posY, textPaint)
             }

@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,25 +26,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ViewQuilt
 import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -51,7 +48,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -62,11 +58,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.ararshot.app.ui.theme.ArArColors
 import com.ararshot.app.engine.ImageUtils
+import com.ararshot.app.ui.components.PrecisionSlider
+import com.ararshot.app.ui.components.PrimaryActionButton
+import com.ararshot.app.ui.theme.ArArColors
 import com.ararshot.app.viewmodel.EnhancerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -80,23 +76,20 @@ fun CollageStudioScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val scrollState = rememberScrollState()
-
     val collagePhotos by viewModel.collageBitmaps.collectAsState()
 
     var spacingDp by remember { mutableFloatStateOf(8f) }
-    var cornerRadiusDp by remember { mutableFloatStateOf(8f) }
-    var templateIndex by remember { mutableIntStateOf(0) }
+    var cornerRadiusDp by remember { mutableFloatStateOf(10f) }
 
     val pickPhotoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         uri?.let {
             try {
                 val bmp = ImageUtils.loadBitmapFromUri(context, it, maxDim = 1200)
                 viewModel.addCollagePhoto(bmp)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Gagal memuat foto: ${e.message}", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Gagal membuka foto", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -104,7 +97,7 @@ fun CollageStudioScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Studio Kolase", fontWeight = FontWeight.Bold) },
+                title = { Text("Kolase", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
@@ -112,195 +105,164 @@ fun CollageStudioScreen(
                 },
                 actions = {
                     if (collagePhotos.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clearCollage() }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Atur Ulang")
-                        }
+                        Text(
+                            text = "Hapus Semua",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = ArArColors.TextSecondary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(100))
+                                .clickable { viewModel.clearCollage() }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = ArArColors.CanvasBg)
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = ArArColors.CanvasBg
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(scrollState)
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // COLLAGE CANVAS PREVIEW (Square 1:1)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(ArArColors.Ink)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(ArArColors.Surface1)
+                    .border(1.dp, ArArColors.Border, RoundedCornerShape(18.dp))
                     .padding(spacingDp.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (collagePhotos.isEmpty()) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ViewQuilt,
                             contentDescription = null,
-                            tint = Color.Gray,
-                            modifier = Modifier.size(54.dp)
+                            tint = ArArColors.TextMuted,
+                            modifier = Modifier.size(44.dp)
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Belum Ada Foto Dipilih",
-                            color = Color.LightGray,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Tambahkan 2 s.d. 4 foto untuk membuat kolase.",
-                            color = Color.Gray,
-                            fontSize = 12.sp
-                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text("Pilih 2 sampai 4 foto", style = MaterialTheme.typography.bodyMedium, color = ArArColors.TextSecondary)
                     }
                 } else {
                     CollageLayoutRenderer(
                         photos = collagePhotos,
                         spacingDp = spacingDp,
-                        cornerRadiusDp = cornerRadiusDp,
-                        templateIndex = templateIndex
+                        cornerRadiusDp = cornerRadiusDp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // PHOTO SLOTS & ADD BUTTON
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Foto Kolase (${collagePhotos.size}/4)",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-
-                if (collagePhotos.size < 4) {
-                    Button(
-                        onClick = { pickPhotoLauncher.launch("image/*") },
-                        shape = RoundedCornerShape(14.dp)
+                collagePhotos.forEachIndexed { index, bmp ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, ArArColors.Border, RoundedCornerShape(10.dp))
                     ) {
-                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Tambah Foto", fontSize = 12.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Thumbnails row
-            if (collagePhotos.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    collagePhotos.forEachIndexed { index, bmp ->
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                        ) {
-                            Image(
-                                bitmap = bmp.asImageBitmap(),
-                                contentDescription = "Slot $index",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
-                    for (i in collagePhotos.size until 4) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                                .clickable { pickPhotoLauncher.launch("image/*") },
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.7f))
+                                .clickable { viewModel.removeCollagePhotoAt(index) },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Close, contentDescription = "Hapus", tint = Color.White, modifier = Modifier.size(13.dp))
                         }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // SLIDERS: SPACING & CORNERS
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Pengaturan Tampilan Kolase", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Jarak Antarfoto:", fontSize = 12.sp)
-                        Text("${spacingDp.toInt()} dp", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                for (i in collagePhotos.size until 4) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(ArArColors.Surface2)
+                            .border(1.dp, ArArColors.Border, RoundedCornerShape(10.dp))
+                            .clickable {
+                                pickPhotoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Tambah", tint = ArArColors.TextMuted, modifier = Modifier.size(22.dp))
                     }
-                    Slider(value = spacingDp, onValueChange = { spacingDp = it }, valueRange = 0f..24f)
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Kelengkungan Sudut:", fontSize = 12.sp)
-                        Text("${cornerRadiusDp.toInt()} dp", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Slider(value = cornerRadiusDp, onValueChange = { cornerRadiusDp = it }, valueRange = 0f..24f)
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(18.dp))
 
-            // SAVE COLLAGE BUTTON
-            Button(
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(ArArColors.Surface1)
+                    .border(1.dp, ArArColors.Border, RoundedCornerShape(16.dp))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                PrecisionSlider(
+                    label = "Jarak",
+                    value = spacingDp,
+                    valueRange = 0f..24f,
+                    defaultValue = 8f,
+                    valueFormatter = { "${it.toInt()} dp" },
+                    onValueChange = { spacingDp = it }
+                )
+                PrecisionSlider(
+                    label = "Sudut",
+                    value = cornerRadiusDp,
+                    valueRange = 0f..24f,
+                    defaultValue = 10f,
+                    valueFormatter = { "${it.toInt()} dp" },
+                    onValueChange = { cornerRadiusDp = it }
+                )
+            }
+
+            Spacer(Modifier.height(18.dp))
+
+            PrimaryActionButton(
+                text = "Simpan Kolase",
+                icon = Icons.Default.Download,
+                enabled = collagePhotos.isNotEmpty(),
                 onClick = {
-                    if (collagePhotos.isEmpty()) {
-                        Toast.makeText(context, "Tambahkan foto terlebih dahulu!", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
                     coroutineScope.launch(Dispatchers.Default) {
-                        val collageBmp = renderCollageToBitmap(collagePhotos, spacingDp, cornerRadiusDp)
-                        val saved = ImageUtils.saveBitmapToGallery(context, collageBmp, "ArArShot_Collage_${System.currentTimeMillis()}")
+                        val bmp = renderCollageToBitmap(collagePhotos, spacingDp, cornerRadiusDp)
+                        val ok = ImageUtils.saveBitmapToGallery(context, bmp, "ArArShot_Collage_${System.currentTimeMillis()}")
                         withContext(Dispatchers.Main) {
                             Toast.makeText(
                                 context,
-                                if (saved) "Kolase berhasil disimpan ke Galeri (Pictures/ArArShot)!" else "Gagal menyimpan kolase.",
-                                Toast.LENGTH_LONG
+                                if (ok) "Kolase tersimpan di Galeri" else "Gagal menyimpan kolase",
+                                Toast.LENGTH_SHORT
                             ).show()
                         }
                     }
                 },
-                enabled = collagePhotos.isNotEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Simpan Kolase ke Galeri", fontWeight = FontWeight.Bold)
-            }
+                    .height(48.dp)
+            )
         }
     }
 }
@@ -309,158 +271,60 @@ fun CollageStudioScreen(
 fun CollageLayoutRenderer(
     photos: List<Bitmap>,
     spacingDp: Float,
-    cornerRadiusDp: Float,
-    templateIndex: Int
+    cornerRadiusDp: Float
 ) {
     val cornerShape = RoundedCornerShape(cornerRadiusDp.dp)
-
     when (photos.size) {
         1 -> {
             Image(
                 bitmap = photos[0].asImageBitmap(),
                 contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(cornerShape),
+                modifier = Modifier.fillMaxSize().clip(cornerShape),
                 contentScale = ContentScale.Crop
             )
         }
         2 -> {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)
-            ) {
-                Image(
-                    bitmap = photos[0].asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .clip(cornerShape),
-                    contentScale = ContentScale.Crop
-                )
-                Image(
-                    bitmap = photos[1].asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .clip(cornerShape),
-                    contentScale = ContentScale.Crop
-                )
+            Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)) {
+                photos.forEach { bmp ->
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier.weight(1f).fillMaxSize().clip(cornerShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         }
         3 -> {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(spacingDp.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacingDp.dp)) {
                 Image(
                     bitmap = photos[0].asImageBitmap(),
                     contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(cornerShape),
+                    modifier = Modifier.fillMaxWidth().weight(1f).clip(cornerShape),
                     contentScale = ContentScale.Crop
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)
-                ) {
-                    Image(
-                        bitmap = photos[1].asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .clip(cornerShape),
-                        contentScale = ContentScale.Crop
-                    )
-                    Image(
-                        bitmap = photos[2].asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .clip(cornerShape),
-                        contentScale = ContentScale.Crop
-                    )
+                Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)) {
+                    Image(bitmap = photos[1].asImageBitmap(), contentDescription = null, modifier = Modifier.weight(1f).fillMaxSize().clip(cornerShape), contentScale = ContentScale.Crop)
+                    Image(bitmap = photos[2].asImageBitmap(), contentDescription = null, modifier = Modifier.weight(1f).fillMaxSize().clip(cornerShape), contentScale = ContentScale.Crop)
                 }
             }
         }
         else -> {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(spacingDp.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)
-                ) {
-                    Image(
-                        bitmap = photos[0].asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .clip(cornerShape),
-                        contentScale = ContentScale.Crop
-                    )
-                    Image(
-                        bitmap = photos[1].asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .clip(cornerShape),
-                        contentScale = ContentScale.Crop
-                    )
+            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacingDp.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)) {
+                    Image(bitmap = photos[0].asImageBitmap(), contentDescription = null, modifier = Modifier.weight(1f).fillMaxSize().clip(cornerShape), contentScale = ContentScale.Crop)
+                    Image(bitmap = photos[1].asImageBitmap(), contentDescription = null, modifier = Modifier.weight(1f).fillMaxSize().clip(cornerShape), contentScale = ContentScale.Crop)
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)
-                ) {
-                    Image(
-                        bitmap = photos[2].asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .clip(cornerShape),
-                        contentScale = ContentScale.Crop
-                    )
-                    Image(
-                        bitmap = photos[3].asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .clip(cornerShape),
-                        contentScale = ContentScale.Crop
-                    )
+                Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(spacingDp.dp)) {
+                    Image(bitmap = photos[2].asImageBitmap(), contentDescription = null, modifier = Modifier.weight(1f).fillMaxSize().clip(cornerShape), contentScale = ContentScale.Crop)
+                    Image(bitmap = photos[3].asImageBitmap(), contentDescription = null, modifier = Modifier.weight(1f).fillMaxSize().clip(cornerShape), contentScale = ContentScale.Crop)
                 }
             }
         }
     }
 }
 
-/**
- * Draws a bitmap center-cropped (ContentScale.Crop) inside dstRect with rounded corners.
- */
-private fun drawBitmapCenterCropRounded(
-    canvas: Canvas,
-    bitmap: Bitmap,
-    dstRect: RectF,
-    cornerRadiusPx: Float,
-    paint: Paint
-) {
+private fun drawBitmapCenterCropRounded(canvas: Canvas, bitmap: Bitmap, dstRect: RectF, cornerRadiusPx: Float, paint: Paint) {
     val dstW = dstRect.width()
     val dstH = dstRect.height()
     if (dstW <= 0f || dstH <= 0f) return
@@ -479,33 +343,24 @@ private fun drawBitmapCenterCropRounded(
         cropW = srcW
         cropH = srcW / dstAspect
     }
-
     val srcLeft = ((srcW - cropW) * 0.5f).toInt().coerceAtLeast(0)
     val srcTop = ((srcH - cropH) * 0.5f).toInt().coerceAtLeast(0)
-    val srcRight = (srcLeft + cropW.toInt()).coerceAtMost(bitmap.width)
-    val srcBottom = (srcTop + cropH.toInt()).coerceAtMost(bitmap.height)
-    val srcRect = Rect(srcLeft, srcTop, srcRight, srcBottom)
+    val srcRect = Rect(srcLeft, srcTop, (srcLeft + cropW.toInt()).coerceAtMost(bitmap.width), (srcTop + cropH.toInt()).coerceAtMost(bitmap.height))
 
     val saveCount = canvas.save()
     if (cornerRadiusPx > 0.5f) {
-        val clipPath = Path().apply {
-            addRoundRect(dstRect, cornerRadiusPx, cornerRadiusPx, Path.Direction.CW)
-        }
+        val clipPath = Path().apply { addRoundRect(dstRect, cornerRadiusPx, cornerRadiusPx, Path.Direction.CW) }
         canvas.clipPath(clipPath)
     }
     canvas.drawBitmap(bitmap, srcRect, dstRect, paint)
     canvas.restoreToCount(saveCount)
 }
 
-/**
- * Renders the collage layout directly onto a 1200x1200 high-res bitmap for gallery saving,
- * preserving both Center-Crop aspect ratio and rounded corners (WYSIWYG).
- */
 fun renderCollageToBitmap(photos: List<Bitmap>, spacingDp: Float, cornerRadiusDp: Float): Bitmap {
     val size = 1200
     val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(output)
-    canvas.drawColor(android.graphics.Color.rgb(30, 30, 30))
+    canvas.drawColor(android.graphics.Color.rgb(17, 20, 28))
 
     val spacingPx = spacingDp * 3f
     val cornerRadiusPx = cornerRadiusDp * 3f
@@ -513,46 +368,29 @@ fun renderCollageToBitmap(photos: List<Bitmap>, spacingDp: Float, cornerRadiusDp
 
     when (photos.size) {
         1 -> {
-            val dest = RectF(spacingPx, spacingPx, size - spacingPx, size - spacingPx)
-            drawBitmapCenterCropRounded(canvas, photos[0], dest, cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[0], RectF(spacingPx, spacingPx, size - spacingPx, size - spacingPx), cornerRadiusPx, paint)
         }
         2 -> {
             val halfW = (size - spacingPx * 3) / 2f
             val h = size - spacingPx * 2
-
-            val rect1 = RectF(spacingPx, spacingPx, spacingPx + halfW, spacingPx + h)
-            val rect2 = RectF(spacingPx * 2 + halfW, spacingPx, spacingPx * 2 + halfW * 2, spacingPx + h)
-
-            drawBitmapCenterCropRounded(canvas, photos[0], rect1, cornerRadiusPx, paint)
-            drawBitmapCenterCropRounded(canvas, photos[1], rect2, cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[0], RectF(spacingPx, spacingPx, spacingPx + halfW, spacingPx + h), cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[1], RectF(spacingPx * 2 + halfW, spacingPx, spacingPx * 2 + halfW * 2, spacingPx + h), cornerRadiusPx, paint)
         }
         3 -> {
             val halfH = (size - spacingPx * 3) / 2f
-            val rectTop = RectF(spacingPx, spacingPx, size - spacingPx, spacingPx + halfH)
-
             val halfW = (size - spacingPx * 3) / 2f
-            val rectBtm1 = RectF(spacingPx, spacingPx * 2 + halfH, spacingPx + halfW, size - spacingPx)
-            val rectBtm2 = RectF(spacingPx * 2 + halfW, spacingPx * 2 + halfH, size - spacingPx, size - spacingPx)
-
-            drawBitmapCenterCropRounded(canvas, photos[0], rectTop, cornerRadiusPx, paint)
-            drawBitmapCenterCropRounded(canvas, photos[1], rectBtm1, cornerRadiusPx, paint)
-            drawBitmapCenterCropRounded(canvas, photos[2], rectBtm2, cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[0], RectF(spacingPx, spacingPx, size - spacingPx, spacingPx + halfH), cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[1], RectF(spacingPx, spacingPx * 2 + halfH, spacingPx + halfW, size - spacingPx), cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[2], RectF(spacingPx * 2 + halfW, spacingPx * 2 + halfH, size - spacingPx, size - spacingPx), cornerRadiusPx, paint)
         }
         else -> {
             val halfW = (size - spacingPx * 3) / 2f
             val halfH = (size - spacingPx * 3) / 2f
-
-            val r1 = RectF(spacingPx, spacingPx, spacingPx + halfW, spacingPx + halfH)
-            val r2 = RectF(spacingPx * 2 + halfW, spacingPx, size - spacingPx, spacingPx + halfH)
-            val r3 = RectF(spacingPx, spacingPx * 2 + halfH, spacingPx + halfW, size - spacingPx)
-            val r4 = RectF(spacingPx * 2 + halfW, spacingPx * 2 + halfH, size - spacingPx, size - spacingPx)
-
-            drawBitmapCenterCropRounded(canvas, photos[0], r1, cornerRadiusPx, paint)
-            drawBitmapCenterCropRounded(canvas, photos[1], r2, cornerRadiusPx, paint)
-            drawBitmapCenterCropRounded(canvas, photos[2], r3, cornerRadiusPx, paint)
-            drawBitmapCenterCropRounded(canvas, photos[3], r4, cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[0], RectF(spacingPx, spacingPx, spacingPx + halfW, spacingPx + halfH), cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[1], RectF(spacingPx * 2 + halfW, spacingPx, size - spacingPx, spacingPx + halfH), cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[2], RectF(spacingPx, spacingPx * 2 + halfH, spacingPx + halfW, size - spacingPx), cornerRadiusPx, paint)
+            drawBitmapCenterCropRounded(canvas, photos[3], RectF(spacingPx * 2 + halfW, spacingPx * 2 + halfH, size - spacingPx, size - spacingPx), cornerRadiusPx, paint)
         }
     }
-
     return output
 }

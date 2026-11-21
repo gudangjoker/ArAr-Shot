@@ -8,129 +8,129 @@ import android.graphics.Paint
 import android.graphics.Shader
 import android.util.Log
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.Segmentation
-import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.nio.ByteBuffer
+import java.nio.FloatBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
 enum class BgReplaceMode(val displayName: String) {
-    TRANSPARENT("Hapus Latar Belakang (PNG Transparan)"),
-    SOLID_COLOR("Warna Studio Polos"),
-    GRADIENT_STUDIO("Gradasi Cahaya Studio"),
-    BLUR_ORIGINAL("Latar Blur Ala DSLR"),
-    CUSTOM_IMAGE("Ganti Foto dari Galeri"),
-    STUDIO_SHADOW("Bayangan Produk 3D (Drop Shadow)"),
-    STICKER_OUTLINE("Garis Tepi Stiker Putih (Outline)"),
-    COLOR_SPLASH("Warna Subjek (Latar Hitam-Putih)"),
-    PASSPORT_RED("Pasfoto Merah Resmi (#DB1514)"),
-    PASSPORT_BLUE("Pasfoto Biru Resmi (#0054A6)")
+    TRANSPARENT("Transparan (PNG)"),
+    SOLID_COLOR("Warna Polos"),
+    GRADIENT_STUDIO("Gradasi"),
+    BLUR_ORIGINAL("Latar Blur"),
+    CUSTOM_IMAGE("Foto Galeri"),
+    STUDIO_SHADOW("Bayangan"),
+    STICKER_OUTLINE("Stiker"),
+    COLOR_SPLASH("Latar B&W"),
+    PASSPORT_RED("Merah Pasfoto"),
+    PASSPORT_BLUE("Biru Pasfoto")
 }
 
 data class BgReplaceConfig(
     val mode: BgReplaceMode = BgReplaceMode.TRANSPARENT,
     val solidColor: Int = Color.WHITE,
-    val gradientColors: Pair<Int, Int> = Pair(Color.DKGRAY, Color.BLACK),
-    val blurRadius: Float = 15f,
+    val gradientColors: Pair<Int, Int> = Pair(Color.parseColor("#1E293B"), Color.parseColor("#090B10")),
+    val blurRadius: Float = 16f,
     val customBgBitmap: Bitmap? = null,
     val edgeThreshold: Float = 0.5f,
-    val shadowDx: Int = 12,
-    val shadowDy: Int = 22,
+    val shadowDx: Int = 10,
+    val shadowDy: Int = 18,
     val shadowRadius: Int = 16,
-    val shadowAlpha: Float = 0.65f,
+    val shadowAlpha: Float = 0.55f,
     val outlineWidth: Int = 10,
     val outlineColor: Int = Color.WHITE
 )
 
 object BackgroundRemover {
-    private const val TAG = "BackgroundRemover"
+    private const val TAG = "ArArCutout"
 
-    private val segmenter by lazy {
-        val options = SelfieSegmenterOptions.Builder()
-            .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
-            .enableRawSizeMask()
+    private val subjectSegmenter by lazy {
+        val options = SubjectSegmenterOptions.Builder()
+            .enableForegroundConfidenceMask()
             .build()
-        Segmentation.getClient(options)
+        SubjectSegmentation.getClient(options)
     }
 
     /**
-     * Executes AI on-device segmentation and produces a raw foreground confidence buffer.
+     * Runs Google ML Kit Subject Segmentation (works for people, pets, products, and general objects).
+     * Returns a FloatBuffer sized exactly width * height matching the input bitmap.
      */
-    suspend fun segmentImage(bitmap: Bitmap): ByteBuffer = withContext(Dispatchers.Default) {
+    private suspend fun runSubjectSegmentation(bitmap: Bitmap): FloatBuffer? = withContext(Dispatchers.Default) {
         val inputImage = InputImage.fromBitmap(bitmap, 0)
         suspendCancellableCoroutine { continuation ->
-            segmenter.process(inputImage)
-                .addOnSuccessListener { mask ->
-                    continuation.resume(mask.buffer)
+            subjectSegmenter.process(inputImage)
+                .addOnSuccessListener { result ->
+                    continuation.resume(result.foregroundConfidenceMask)
                 }
                 .addOnFailureListener { error ->
-                    Log.e(TAG, "ML Kit segmentation error: ${error.message}", error)
+                    Log.w(TAG, "ML Kit Subject Segmentation unavailable: ${error.message}")
                     continuation.resumeWithException(error)
                 }
         }
     }
 
     /**
-     * Extracts a hair-refined float alpha matte [0.0f, 1.0f] by fusing ML Kit Subject Segmentation
-     * with MODNet NCNN Alpha Matting and O(N) Fast Guided Image Filtering.
+     * Extracts a clean float alpha matte [0..1]:
+     * 1. Runs ML Kit Subject Segmentation (full image resolution, zero buffer mismatch!).
+     * 2. Checks via SCRFD whether the photo contains a human portrait.
+     *    - If portrait: fuses ML Kit mask with MODNet NCNN hair matting + Fast Guided Filter.
+     *    - If non-human object (product/food/pet): refines ML Kit mask with Fast Guided Filter directly
+     *      without letting portrait-only MODNet erase the object!
+     * 3. If Play Services is unavailable (e.g. offline/no-GMS device): falls back cleanly to MODNet offline.
      */
     suspend fun getFloatMask(bitmap: Bitmap): FloatArray = withContext(Dispatchers.Default) {
         val width = bitmap.width
         val height = bitmap.height
         val total = width * height
-        val rawFloats = FloatArray(total)
+        var coarseMask: FloatArray? = null
 
         try {
-            val maskBuffer = segmentImage(bitmap)
-            maskBuffer.rewind()
-            for (i in 0 until total) {
-                rawFloats[i] = maskBuffer.float
+            val maskBuf = runSubjectSegmentation(bitmap)
+            if (maskBuf != null && maskBuf.remaining() >= total) {
+                val arr = FloatArray(total)
+                maskBuf.rewind()
+                maskBuf.get(arr, 0, total)
+                coarseMask = arr
+            } else if (maskBuf != null) {
+                Log.w(TAG, "Unexpected mask size ${maskBuf.remaining()} vs $total; falling back to MODNet")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "ML Kit segmentation fallback active: ${e.message}")
-            val cx = width * 0.5f
-            val cy = height * 0.5f
-            val maxR = max(width, height) * 0.42f
-            for (y in 0 until height) {
-                for (x in 0 until width) {
-                    val dist = hypot(x - cx, y - cy)
-                    rawFloats[y * width + x] = (1.0f - (dist / maxR)).coerceIn(0.0f, 1.0f)
-                }
-            }
+            Log.w(TAG, "Using offline MODNet fallback: ${e.message}")
         }
 
-        // Refine coarse mask with MODNet NCNN + Fast Guided Image Filter for fine hair strands
-        ImageEnhancerNative.extractAlphaMatte(bitmap, rawFloats)
+        val hasFace = ImageEnhancerNative.detectFaces(bitmap).isNotEmpty()
+        ImageEnhancerNative.extractAlphaMatte(
+            input = bitmap,
+            coarseMask = coarseMask,
+            isPortraitHint = hasFace || coarseMask == null
+        )
     }
 
-    /**
-     * Computes a continuous 3D Monocular Depth Map [0.0f, 1.0f] using Depth Anything (dpt256 NCNN)
-     * fused with subject segmentation and 3D geodesic curvature.
-     */
     suspend fun getDepthMap(bitmap: Bitmap): FloatArray = withContext(Dispatchers.Default) {
         val subjectMask = getFloatMask(bitmap)
         ImageEnhancerNative.estimateDepth(bitmap, subjectMask)
     }
 
-    /**
-     * Removes or replaces the background of an image using MODNet + Guided Filter Alpha Matting
-     * and Foreground Color Decontamination.
-     */
     suspend fun processBackground(
         source: Bitmap,
-        config: BgReplaceConfig
+        config: BgReplaceConfig,
+        cachedAlphaMatte: FloatArray? = null
     ): Bitmap = withContext(Dispatchers.Default) {
         val width = source.width
         val height = source.height
         val total = width * height
 
-        val alphaMatte = getFloatMask(source)
+        val alphaMatte = if (cachedAlphaMatte != null && cachedAlphaMatte.size == total) {
+            cachedAlphaMatte
+        } else {
+            getFloatMask(source)
+        }
 
         if (config.mode == BgReplaceMode.STUDIO_SHADOW || config.mode == BgReplaceMode.STICKER_OUTLINE) {
             val outlineW = if (config.mode == BgReplaceMode.STICKER_OUTLINE) config.outlineWidth else 0
@@ -176,53 +176,39 @@ object BackgroundRemover {
                     Shader.TileMode.CLAMP
                 )
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-                val bg = IntArray(total)
-                gradBmp.getPixels(bg, 0, width, 0, 0, width, height)
-                bg
+                IntArray(total).also { gradBmp.getPixels(it, 0, width, 0, 0, width, height) }
             }
             BgReplaceMode.BLUR_ORIGINAL -> {
-                val blurredScaled = Bitmap.createScaledBitmap(source, max(1, width / 6), max(1, height / 6), true)
-                val blurredFull = Bitmap.createScaledBitmap(blurredScaled, width, height, true)
-                val bg = IntArray(total)
-                blurredFull.getPixels(bg, 0, width, 0, 0, width, height)
-                bg
+                val small = Bitmap.createScaledBitmap(source, max(1, width / 6), max(1, height / 6), true)
+                val full = Bitmap.createScaledBitmap(small, width, height, true)
+                IntArray(total).also { full.getPixels(it, 0, width, 0, 0, width, height) }
             }
             BgReplaceMode.CUSTOM_IMAGE -> {
-                if (config.customBgBitmap != null) {
-                    val scaledBg = Bitmap.createScaledBitmap(config.customBgBitmap, width, height, true)
-                    val bg = IntArray(total)
-                    scaledBg.getPixels(bg, 0, width, 0, 0, width, height)
-                    bg
+                val custom = config.customBgBitmap
+                if (custom != null) {
+                    val scaled = Bitmap.createScaledBitmap(custom, width, height, true)
+                    IntArray(total).also { scaled.getPixels(it, 0, width, 0, 0, width, height) }
                 } else {
                     IntArray(total) { Color.WHITE }
                 }
             }
-            BgReplaceMode.PASSPORT_RED -> {
-                val red = Color.parseColor("#DB1514")
-                IntArray(total) { red }
-            }
-            BgReplaceMode.PASSPORT_BLUE -> {
-                val blue = Color.parseColor("#0054A6")
-                IntArray(total) { blue }
-            }
+            BgReplaceMode.PASSPORT_RED -> IntArray(total) { Color.parseColor("#DB1514") }
+            BgReplaceMode.PASSPORT_BLUE -> IntArray(total) { Color.parseColor("#0054A6") }
             BgReplaceMode.COLOR_SPLASH -> {
-                val bg = IntArray(total)
-                for (i in 0 until total) {
+                IntArray(total) { i ->
                     val p = srcPixels[i]
                     val r = (p ushr 16) and 0xFF
                     val g = (p ushr 8) and 0xFF
                     val b = p and 0xFF
-                    val gray = (0.299f * r + 0.587f * g + 0.114f * b).toInt().coerceIn(0, 255)
-                    bg[i] = (0xFF shl 24) or (gray shl 16) or (gray shl 8) or gray
+                    val gray = (0.2126f * r + 0.7152f * g + 0.0722f * b).toInt().coerceIn(0, 255)
+                    (0xFF shl 24) or (gray shl 16) or (gray shl 8) or gray
                 }
-                bg
             }
-            BgReplaceMode.STUDIO_SHADOW,
-            BgReplaceMode.STICKER_OUTLINE -> null
+            BgReplaceMode.STUDIO_SHADOW, BgReplaceMode.STICKER_OUTLINE -> null
         }
 
         val threshold = config.edgeThreshold.coerceIn(0.20f, 0.80f)
-        val transWidth = 0.15f
+        val transWidth = 0.14f
         val edge0 = (threshold - transWidth).coerceAtLeast(0.02f)
         val edge1 = (threshold + transWidth).coerceAtMost(0.98f)
         val invSpan = 1.0f / (edge1 - edge0)
@@ -240,9 +226,8 @@ object BackgroundRemover {
                 val t = ((confidence - edge0) * invSpan).coerceIn(0.0f, 1.0f)
                 val alphaFactor = t * t * (3.0f - 2.0f * t)
 
-                // Foreground Color Decontamination on semi-transparent hair/boundary pixels
-                if (alphaFactor in 0.05f..0.92f) {
-                    // Sample nearby confident foreground pixel within a 4px cross to remove background color spill
+                // Color decontamination on semi-transparent boundary pixels to remove background fringe
+                if (alphaFactor in 0.05f..0.90f) {
                     val step = 3
                     val candidates = intArrayOf(
                         y * width + min(width - 1, x + step),
@@ -253,13 +238,10 @@ object BackgroundRemover {
                     for (cIdx in candidates) {
                         if (alphaMatte[cIdx] > confidence + 0.15f) {
                             val cp = srcPixels[cIdx]
-                            val cr = (cp ushr 16) and 0xFF
-                            val cg = (cp ushr 8) and 0xFF
-                            val cb = cp and 0xFF
                             val decontamW = (1.0f - alphaFactor) * 0.55f
-                            fgR = (fgR * (1.0f - decontamW) + cr * decontamW).toInt().coerceIn(0, 255)
-                            fgG = (fgG * (1.0f - decontamW) + cg * decontamW).toInt().coerceIn(0, 255)
-                            fgB = (fgB * (1.0f - decontamW) + cb * decontamW).toInt().coerceIn(0, 255)
+                            fgR = (fgR * (1.0f - decontamW) + ((cp ushr 16) and 0xFF) * decontamW).toInt().coerceIn(0, 255)
+                            fgG = (fgG * (1.0f - decontamW) + ((cp ushr 8) and 0xFF) * decontamW).toInt().coerceIn(0, 255)
+                            fgB = (fgB * (1.0f - decontamW) + (cp and 0xFF) * decontamW).toInt().coerceIn(0, 255)
                             break
                         }
                     }
@@ -273,14 +255,10 @@ object BackgroundRemover {
                     val bgR = (bgPixel ushr 16) and 0xFF
                     val bgG = (bgPixel ushr 8) and 0xFF
                     val bgB = bgPixel and 0xFF
-
-                    val fgF = alphaFactor
-                    val bgF = 1.0f - fgF
-
-                    val finalR = (fgR * fgF + bgR * bgF).toInt().coerceIn(0, 255)
-                    val finalG = (fgG * fgF + bgG * bgF).toInt().coerceIn(0, 255)
-                    val finalB = (fgB * fgF + bgB * bgF).toInt().coerceIn(0, 255)
-
+                    val bgF = 1.0f - alphaFactor
+                    val finalR = (fgR * alphaFactor + bgR * bgF).toInt().coerceIn(0, 255)
+                    val finalG = (fgG * alphaFactor + bgG * bgF).toInt().coerceIn(0, 255)
+                    val finalB = (fgB * alphaFactor + bgB * bgF).toInt().coerceIn(0, 255)
                     outPixels[i] = (0xFF shl 24) or (finalR shl 16) or (finalG shl 8) or finalB
                 }
             }
@@ -290,62 +268,43 @@ object BackgroundRemover {
         output
     }
 
-    /**
-     * Text Behind Subject: Sandwich Compositing
-     * Layer 1: Background (baseImage)
-     * Layer 2: Styled Typography Text
-     * Layer 3: Foreground Subject Cutout (with Guided Filter hair-refined edge blending)
-     */
     suspend fun renderTextBehindSubject(
         baseImage: Bitmap,
-        textConfig: TextOverlayConfig
+        textConfig: TextOverlayConfig,
+        cachedAlphaMatte: FloatArray? = null
     ): Bitmap = withContext(Dispatchers.Default) {
         val width = baseImage.width
         val height = baseImage.height
         val total = width * height
 
-        val mask = getFloatMask(baseImage)
-        val textLayer = TextStyler.drawTextOnBitmap(baseImage, textConfig)
-
-        val composite = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val origPixels = IntArray(total)
-        baseImage.getPixels(origPixels, 0, width, 0, 0, width, height)
-
-        val textPixels = IntArray(total)
-        textLayer.getPixels(textPixels, 0, width, 0, 0, width, height)
-
-        val outPixels = IntArray(total)
-
-        for (i in 0 until total) {
-            val conf = mask[i]
-            val t = ((conf - 0.35f) / 0.30f).coerceIn(0.0f, 1.0f)
-            val alphaFactor = t * t * (3.0f - 2.0f * t)
-
-            if (alphaFactor >= 0.99f) {
-                outPixels[i] = origPixels[i]
-            } else if (alphaFactor <= 0.01f) {
-                outPixels[i] = textPixels[i]
-            } else {
-                val origP = origPixels[i]
-                val textP = textPixels[i]
-
-                val oR = (origP ushr 16) and 0xFF
-                val oG = (origP ushr 8) and 0xFF
-                val oB = origP and 0xFF
-
-                val tR = (textP ushr 16) and 0xFF
-                val tG = (textP ushr 8) and 0xFF
-                val tB = textP and 0xFF
-
-                val fR = (oR * alphaFactor + tR * (1.0f - alphaFactor)).toInt().coerceIn(0, 255)
-                val fG = (oG * alphaFactor + tG * (1.0f - alphaFactor)).toInt().coerceIn(0, 255)
-                val fB = (oB * alphaFactor + tB * (1.0f - alphaFactor)).toInt().coerceIn(0, 255)
-
-                outPixels[i] = (0xFF shl 24) or (fR shl 16) or (fG shl 8) or fB
-            }
+        val alphaMatte = if (cachedAlphaMatte != null && cachedAlphaMatte.size == total) {
+            cachedAlphaMatte
+        } else {
+            getFloatMask(baseImage)
         }
 
-        composite.setPixels(outPixels, 0, width, 0, 0, width, height)
-        composite
+        val withText = TextStyler.drawTextOnBitmap(baseImage, textConfig)
+        val basePixels = IntArray(total)
+        val textPixels = IntArray(total)
+        baseImage.getPixels(basePixels, 0, width, 0, 0, width, height)
+        withText.getPixels(textPixels, 0, width, 0, 0, width, height)
+
+        val outPixels = IntArray(total)
+        for (i in 0 until total) {
+            val t = ((alphaMatte[i] - 0.35f) / 0.30f).coerceIn(0.0f, 1.0f)
+            val fgF = t * t * (3.0f - 2.0f * t)
+            val bgF = 1.0f - fgF
+
+            val fgP = basePixels[i]
+            val bgP = textPixels[i]
+            val r = (((fgP ushr 16) and 0xFF) * fgF + ((bgP ushr 16) and 0xFF) * bgF).toInt().coerceIn(0, 255)
+            val g = (((fgP ushr 8) and 0xFF) * fgF + ((bgP ushr 8) and 0xFF) * bgF).toInt().coerceIn(0, 255)
+            val b = ((fgP and 0xFF) * fgF + (bgP and 0xFF) * bgF).toInt().coerceIn(0, 255)
+            outPixels[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+        }
+
+        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            setPixels(outPixels, 0, width, 0, 0, width, height)
+        }
     }
 }

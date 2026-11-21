@@ -29,10 +29,10 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Setup Android NDK and CMake
+      - name: Setup Android SDK 35, NDK and CMake
         run: |
           echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "cmake;3.22.1" "ndk;26.1.10909125" || true
+          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125" || true
           sudo chown -R $USER:$USER ${ANDROID_HOME} || true
 
       - name: Setup NCNN Android Vulkan SDK
@@ -40,7 +40,7 @@ jobs:
           chmod +x setup_ncnn.sh
           ./setup_ncnn.sh
 
-      - name: Verify 6-Model Bundled SOTA NCNN Assets
+      - name: Verify Bundled NCNN Assets
         run: |
           mkdir -p app/src/main/assets/models
           ls -lh app/src/main/assets/models/
@@ -50,8 +50,7 @@ jobs:
           if [ -f "release.keystore" ]; then
             echo "Using tracked permanent release keystore."
           else
-            echo "Keystore not found, regenerating fallback..."
-            keytool -genkeypair -v -keystore release.keystore -alias ararshot -keyalg RSA -keysize 2048 -validity 10000 -storepass ararshotpassword -keypass ararshotpassword -dname "CN=ArAr Shot Studio, OU=Mobile Development, O=GudangJoker, L=Jakarta, ST=DKI, C=ID"
+            keytool -genkeypair -v -keystore release.keystore -alias ararshot -keyalg RSA -keysize 2048 -validity 10000 -storepass ararshotpassword -keypass ararshotpassword -dname "CN=ArAr Shot, OU=Mobile, O=GudangJoker, L=Jakarta, ST=DKI, C=ID"
           fi
 
       - name: Grant Execute Permission for Gradlew
@@ -66,53 +65,45 @@ jobs:
       - name: Prepare Named Release APKs
         run: |
           mkdir -p release_assets
-          echo "=== Locating built APKs ==="
           find app/build/outputs/apk -type f -name "*.apk" -ls
 
-          # Copy release APK
           for f in app/build/outputs/apk/release/*.apk; do
             if [ -f "$f" ]; then
-              cp -v "$f" "release_assets/ArAr-Shot-v2.0.1.apk"
-              cp -v "$f" "release_assets/ArAr-Shot-v2.0.1-release.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v3.0.0.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v3.0.0-release.apk"
               break
             fi
           done
 
-          # Copy debug APK
           for f in app/build/outputs/apk/debug/*.apk; do
             if [ -f "$f" ]; then
-              cp -v "$f" "release_assets/ArAr-Shot-v2.0.1-debug.apk"
+              cp -v "$f" "release_assets/ArAr-Shot-v3.0.0-debug.apk"
               break
             fi
           done
-
-          if [ ! -f "release_assets/ArAr-Shot-v2.0.1.apk" ]; then
-            echo "ERROR: release_assets/ArAr-Shot-v2.0.1.apk not found!"
-            exit 1
-          fi
 
           ls -lh release_assets/
 
       - name: Upload Signed Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v2.0.1-Release-APK
-          path: release_assets/ArAr-Shot-v2.0.1*.apk
+          name: ArArShot-v3.0.0-Release-APK
+          path: release_assets/ArAr-Shot-v3.0.0*.apk
           if-no-files-found: error
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArArShot-v2.0.1-Debug-APK
-          path: release_assets/ArAr-Shot-v2.0.1-debug.apk
+          name: ArArShot-v3.0.0-Debug-APK
+          path: release_assets/ArAr-Shot-v3.0.0-debug.apk
           if-no-files-found: warn
 
       - name: Publish Official GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v2.0.1' }}
-          name: "ArAr Shot v2.0.1"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v3.0.0' }}
+          name: "ArAr Shot v3.0.0"
           body_path: RELEASE_NOTES.md
           make_latest: true
           files: release_assets/*.apk

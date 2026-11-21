@@ -2,11 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Hardware Permission: Camera only (No Microphone/Audio tracking) -->
+    <!-- Camera (optional) -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Storage and Media Permissions (Android 7.0 through Android 14+) -->
+    <!-- Media access for quick gallery grid on Home -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -15,7 +16,6 @@
         android:maxSdkVersion="28"
         tools:ignore="ScopedStorage" />
 
-    <!-- Optional Hardware Features (Allows installation across all device models) -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
@@ -25,24 +25,53 @@
 
     <application
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:largeHeap="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:requestLegacyExternalStorage="true"
-        android:theme="@style/Theme.MyApplication">
+        android:theme="@style/Theme.ArArShot"
+        tools:targetApi="tiramisu">
+
+        <!-- Auto-download ML Kit Subject Segmentation via Play Services -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="subject_segment" />
+
         <activity
             android:name="com.ararshot.app.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.MyApplication">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.ArArShot"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.EDIT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
         </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>
