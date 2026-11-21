@@ -6,7 +6,7 @@ plugins {
 }
 
 base {
-    archivesName.set("ArAr-Shot-v3.0.0")
+    archivesName.set("ArAr-Shot-v3.1.0")
 }
 
 android {
@@ -18,8 +18,8 @@ android {
         applicationId = "com.ararshot.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "3.0.0"
+        versionCode = 11
+        versionName = "3.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -129,6 +129,11 @@ dependencies {
 
     // Google ML Kit Subject Segmentation (people, pets, products, general objects)
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+
+    // TensorFlow Lite runtime for on-demand non-anime Animation engines (DCT-Net + White-box Cartoonization)
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-gpu-api:2.16.1")
 
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.core)

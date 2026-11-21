@@ -25,12 +25,17 @@ import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -63,6 +68,8 @@ import com.ararshot.app.engine.PassportSize
 import com.ararshot.app.engine.TextFontFamily
 import com.ararshot.app.engine.TextOverlayConfig
 import com.ararshot.app.engine.TextStyleModel
+import com.ararshot.app.model.AnimationModelsUiState
+import com.ararshot.app.model.AnimationStyle
 import com.ararshot.app.model.ColorAdjustments
 import com.ararshot.app.model.ExportSizeOption
 import com.ararshot.app.model.FilterPreset
@@ -760,44 +767,190 @@ fun ErasePanel(
 }
 
 // ---------------------------------------------------------------------------
-// 8. Anime Style Panel
+// 8. Non-Anime Animation Panel (7 On-Demand TFLite Models)
 // ---------------------------------------------------------------------------
 
 @Composable
-fun AnimePanel(
-    onApply: (styleMode: Int, strength: Float) -> Unit
+fun AnimationPanel(
+    modelsState: AnimationModelsUiState,
+    onDownloadStyle: (AnimationStyle) -> Unit,
+    onCancelDownload: () -> Unit,
+    onOpenModelManager: () -> Unit,
+    onApply: (style: AnimationStyle, strength: Float) -> Unit
 ) {
-    var styleMode by remember { mutableIntStateOf(ImageEnhancerNative.ANIME_STYLE_SMOOTH) }
-    var strength by remember { mutableStateOf(0.9f) }
+    var selectedStyle by remember { mutableStateOf(AnimationStyle.ANIMATION_3D) }
+    var strength by remember { mutableStateOf(0.92f) }
 
-    val styles = listOf(
-        ImageEnhancerNative.ANIME_STYLE_SMOOTH to "Anime Halus",
-        ImageEnhancerNative.ANIME_STYLE_ILLUSTRATION to "Ilustrasi",
-        ImageEnhancerNative.ANIME_STYLE_SKETCH to "Sketsa"
-    )
+    val isInstalled = selectedStyle.id in modelsState.installedIds
+    val isDownloadingSelected = modelsState.downloadingId == selectedStyle.id
+    val isAnyDownloading = modelsState.downloadingId != null
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            styles.forEach { (id, label) ->
-                SelectablePill(label = label, selected = styleMode == id, onClick = { styleMode = id })
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AnimationStyle.entries.forEach { style ->
+                val selected = selectedStyle == style
+                val installed = style.id in modelsState.installedIds
+                val downloading = modelsState.downloadingId == style.id
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(100))
+                        .background(if (selected) ArArColors.Surface3 else ArArColors.Surface2)
+                        .border(
+                            width = 1.dp,
+                            color = if (selected) ArArColors.AccentCyan else ArArColors.Border,
+                            shape = RoundedCornerShape(100)
+                        )
+                        .clickable { selectedStyle = style }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = when {
+                            installed -> Icons.Default.CheckCircle
+                            else -> Icons.Default.CloudDownload
+                        },
+                        contentDescription = null,
+                        tint = when {
+                            installed -> ArArColors.Success
+                            downloading -> ArArColors.AccentCyan
+                            else -> ArArColors.TextMuted
+                        },
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = style.displayName,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (selected) ArArColors.TextPrimary else ArArColors.TextSecondary
+                    )
+                }
             }
         }
+
         Spacer(Modifier.height(10.dp))
-        PrecisionSlider(
-            label = "Intensitas",
-            value = strength,
-            valueRange = 0.2f..1.0f,
-            defaultValue = 0.9f,
-            valueFormatter = { "${(it * 100).toInt()}%" },
-            onValueChange = { strength = it }
-        )
-        Spacer(Modifier.height(10.dp))
-        PrimaryActionButton(
-            text = "Terapkan",
-            icon = Icons.Default.Check,
-            onClick = { onApply(styleMode, strength) },
-            modifier = Modifier.fillMaxWidth()
-        )
+
+        when {
+            isDownloadingSelected -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Mengunduh ${selectedStyle.displayName}... ${(modelsState.downloadProgress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ArArColors.AccentCyan
+                    )
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(100))
+                            .clickable(onClick = onCancelDownload)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Batal", tint = ArArColors.TextSecondary, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Batal", fontSize = 12.sp, color = ArArColors.TextSecondary)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { modelsState.downloadProgress.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(100)),
+                    color = ArArColors.AccentCyan,
+                    trackColor = ArArColors.Surface3
+                )
+            }
+
+            isInstalled -> {
+                PrecisionSlider(
+                    label = "Intensitas",
+                    value = strength,
+                    valueRange = 0.25f..1.0f,
+                    defaultValue = 0.92f,
+                    valueFormatter = { "${(it * 100).toInt()}%" },
+                    onValueChange = { strength = it }
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PrimaryActionButton(
+                        text = "Terapkan ${selectedStyle.displayName}",
+                        icon = Icons.Default.Check,
+                        onClick = { onApply(selectedStyle, strength) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(100))
+                            .background(ArArColors.Surface2)
+                            .border(1.dp, ArArColors.Border, RoundedCornerShape(100))
+                            .clickable(onClick = onOpenModelManager)
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Kelola Model",
+                            tint = ArArColors.TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            else -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selectedStyle.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ArArColors.TextSecondary
+                        )
+                        Text(
+                            text = "Ukuran unduhan: ${selectedStyle.sizeLabel} · Sekali unduh, jalan offline",
+                            fontSize = 11.sp,
+                            color = ArArColors.TextMuted
+                        )
+                    }
+                    Text(
+                        text = "Kelola",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ArArColors.AccentCyan,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(100))
+                            .clickable(onClick = onOpenModelManager)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                PrimaryActionButton(
+                    text = "Unduh ${selectedStyle.displayName} (${selectedStyle.sizeLabel})",
+                    icon = Icons.Default.CloudDownload,
+                    enabled = !isAnyDownloading,
+                    onClick = { onDownloadStyle(selectedStyle) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }
 

@@ -1,24 +1,20 @@
 # ArAr Shot
 
-Aplikasi editor foto native Android (Kotlin, Jetpack Compose, C++17 & NCNN) yang dirancang bersih, cepat, dan nyaman untuk kebutuhan dokumentasi pribadi maupun upload media sosial.
+Editor foto Android lokal untuk dokumentasi pribadi dan unggahan media sosial.
 
 ## Fitur Utama
+- **Beranda Pintasan Alat:** Halaman depan bersih tanpa menampilkan galeri foto; setiap alat memiliki ikon dan pemilih fotonya sendiri.
+- **Cahaya, Warna & HSL Linear-Light (C++17):** Eksposur fisik ($2^{\text{EV}}$) dengan *highlight roll-off*, kontras, *highlights/shadows* sadar tepi, *white balance*, vibrance, HSL 8 pita warna, *clarity*, *sharpen*, *vignette*, *grain*, *halation*, serta penyesuaian otomatis.
+- **12 Filter Terkurasi:** Alami, Film, Sejuk, Senja, Lembut, Moody, Cerah, Matte, B&W, Noir, Retro, dan Sinema dengan slider kekuatan.
+- **7 Mesin Animasi Non-Anime (Unduh Manual):**
+  - **DCT-Net (SIGGRAPH 2022, TFLite):** Animasi 3D, Artstyle, Kartun 2D, Ilustrasi, Desain, dan Sketsa (pemrosesan 2 tahap: adegan penuh + perataan wajah 5-titik).
+  - **White-box Cartoonization (CVPR 2020, TFLite):** Kartun Adegan untuk pemandangan, hewan, dan objek.
+  - Semua model diunduh manual oleh pengguna agar ukuran APK tetap ringkas dan berjalan offline setelah terpasang.
+- **Hapus & Ganti Latar:** Google ML Kit Subject Segmentation (orang, hewan, produk, objek umum) dengan *guided filter* & MODNet untuk tepi rambut, dukungan PNG transparan, warna solid, blur latar, bayangan studio, stiker, dan latar kustom.
+- **Tingkatkan & Anti-Noise:** Real-ESRGAN 4X + *denoise*, *face restore* dengan SCRFD, serta penajaman.
+- **Blur Kedalaman & Arah Cahaya:** Bokeh dengan peta kedalaman dan pencahayaan 3D.
+- **Studio Kolase Fleksibel (1–9 Foto):** Banyak template layout untuk 1–9 foto, geser & zoom langsung per kotak, tukar posisi, putar, rasio `1:1` / `4:5` / `9:16` / `3:4` / `16:9`, kustomisasi bingkai & latar, ekspor resolusi tinggi.
+- **Alat Lengkap Lainnya:** Potong & luruskan interaktif, hapus objek dengan kuas, teks di depan/belakang subjek, dan pasfoto (2×3, 3×4, 4×6, lembar cetak 4R).
 
-- **Sesuaikan (Linear-Light):** Otomatis (Auto Enhance), Pencahayaan (EV + *highlight roll-off*), Kontras, Sorotan & Bayangan (*edge-aware*), Putih, Hitam, Suhu & Rona (*chromatic white balance*), Vibrance, Saturasi, **HSL 8-Warna**, Kejernihan, Ketajaman, Vinyet, Grain Film, Fade, dan Halation.
-- **Filter:** 12 preset warna terkurasi dengan pratinjau langsung pada foto dan slider intensitas.
-- **Potong & Luruskan:** Kotak potong interaktif langsung di foto, pelurusan sudut (±45°), putar, balik, serta rasio cepat sosial media (`4:5 IG`, `1:1`, `9:16`, `16:9`, `3:2`).
-- **Tingkatkan:** Anti-Noise, Perjelas Wajah, Tajamkan, dan Resolusi 4X (Real-ESRGAN NCNN).
-- **Hapus & Ganti Latar:** Pemisahan subjek umum (manusia, produk, hewan) menggunakan Google ML Kit Subject Segmentation dipadukan dengan MODNet & Guided Filter untuk tepian halus, ekspor PNG transparan, warna polos, gradasi, blur, bayangan, hingga stiker.
-- **Blur & Pencahayaan:** Efek blur latar berbasis kedalaman (`dpt256`) di ruang *linear light* serta penyesuaian arah cahaya.
-- **Hapus Objek:** Kuas penanda untuk menghilangkan noda atau objek pengganggu.
-- **Gaya Anime:** Transformasi potret ke gaya Anime Halus, Ilustrasi, atau Sketsa dengan *letterbox padding* menjaga proporsi wajah.
-- **Teks, Kolase & Pasfoto:** Tambah teks (termasuk di belakang subjek), kolase 2–4 foto, dan pasfoto ukuran `2×3`, `3×4`, `4×6`, `2×2` lengkap dengan lembar cetak 4R.
-- **Simpan & Bagikan:** Pilihan ukuran (`Asli`, `Optimal Sosmed 1440 px`, `Ringan 1080 px`), format JPG/PNG, serta tombol Bagikan langsung.
-
-## Build Lokal
-
-```bash
-./setup_ncnn.sh
-./gradlew testDebugUnitTest
-./gradlew assembleDebug assembleRelease
-```
+## Build
+Build APK dan pengujian unit dijalankan otomatis melalui GitHub Actions (`.github/workflows/android-build.yml`).

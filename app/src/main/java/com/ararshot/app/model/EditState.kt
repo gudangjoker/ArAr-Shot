@@ -11,7 +11,7 @@ enum class EditorTool(val label: String) {
     BACKGROUND("Latar"),
     BOKEH("Blur"),
     ERASE("Hapus"),
-    ANIME("Anime"),
+    ANIMATION("Animasi"),
     TEXT("Teks"),
     PASSPORT("Pasfoto")
 }

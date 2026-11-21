@@ -7,6 +7,8 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ararshot.app.engine.AnimationEngine
+import com.ararshot.app.engine.AnimationModelManager
 import com.ararshot.app.engine.BackgroundRemover
 import com.ararshot.app.engine.BgReplaceConfig
 import com.ararshot.app.engine.ImageEnhancerNative
@@ -17,11 +19,15 @@ import com.ararshot.app.engine.PassportSize
 import com.ararshot.app.engine.TextOverlayConfig
 import com.ararshot.app.engine.TextStyler
 import com.ararshot.app.engine.TileProcessor
+import com.ararshot.app.model.AnimationModelsUiState
+import com.ararshot.app.model.AnimationStyle
+import com.ararshot.app.model.CollageCellState
 import com.ararshot.app.model.ColorAdjustments
 import com.ararshot.app.model.EditorTool
 import com.ararshot.app.model.ExportSizeOption
 import com.ararshot.app.model.FilterPreset
 import com.ararshot.app.model.GalleryPhoto
+import com.ararshot.app.model.MAX_COLLAGE_PHOTOS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -78,8 +84,13 @@ class EnhancerViewModel : ViewModel() {
     private val _textConfig = MutableStateFlow(TextOverlayConfig())
     val textConfig: StateFlow<TextOverlayConfig> = _textConfig.asStateFlow()
 
-    private val _collageBitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
-    val collageBitmaps: StateFlow<List<Bitmap>> = _collageBitmaps.asStateFlow()
+    private val _collageCells = MutableStateFlow<List<CollageCellState>>(emptyList())
+    val collageCells: StateFlow<List<CollageCellState>> = _collageCells.asStateFlow()
+    private var nextCollageCellId: Long = 1L
+
+    private val _animationModelsState = MutableStateFlow(AnimationModelsUiState())
+    val animationModelsState: StateFlow<AnimationModelsUiState> = _animationModelsState.asStateFlow()
+    private var animationDownloadJob: Job? = null
 
     private val _inpaintMask = MutableStateFlow<Bitmap?>(null)
     val inpaintMask: StateFlow<Bitmap?> = _inpaintMask.asStateFlow()
@@ -533,23 +544,121 @@ class EnhancerViewModel : ViewModel() {
     }
 
     // -----------------------------------------------------------------------
-    // Anime / Illustration / Sketch
+    // Non-Anime Animation Engines & Manual Model Download Manager
     // -----------------------------------------------------------------------
 
-    fun runAnimeStylize(context: Context, styleMode: Int, strength: Float) {
+    fun refreshAnimationModels(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installed = AnimationModelManager.getInstalledStyleIds(context)
+            val totalBytes = AnimationModelManager.getTotalInstalledBytes(context)
+            withContext(Dispatchers.Main) {
+                _animationModelsState.value = _animationModelsState.value.copy(
+                    installedIds = installed,
+                    totalInstalledBytes = totalBytes
+                )
+            }
+        }
+    }
+
+    fun downloadAnimationStyle(context: Context, style: AnimationStyle, onComplete: ((Boolean) -> Unit)? = null) {
+        if (_animationModelsState.value.downloadingId != null) return
+        animationDownloadJob = viewModelScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                _animationModelsState.value = _animationModelsState.value.copy(
+                    downloadingId = style.id,
+                    downloadProgress = 0.02f
+                )
+            }
+
+            val result = AnimationModelManager.downloadStyle(context, style) { progress ->
+                _animationModelsState.value = _animationModelsState.value.copy(
+                    downloadingId = style.id,
+                    downloadProgress = progress
+                )
+            }
+
+            val installed = AnimationModelManager.getInstalledStyleIds(context)
+            val totalBytes = AnimationModelManager.getTotalInstalledBytes(context)
+            withContext(Dispatchers.Main) {
+                _animationModelsState.value = AnimationModelsUiState(
+                    installedIds = installed,
+                    downloadingId = null,
+                    downloadProgress = 0f,
+                    totalInstalledBytes = totalBytes
+                )
+                if (result.isSuccess) {
+                    _processState.value = ProcessState.ToastMessage("Model ${style.displayName} siap digunakan")
+                    onComplete?.invoke(true)
+                } else {
+                    _processState.value = ProcessState.ToastMessage(
+                        "Gagal mengunduh ${style.displayName}. Periksa koneksi internet.",
+                        isError = true
+                    )
+                    onComplete?.invoke(false)
+                }
+            }
+        }
+    }
+
+    fun cancelAnimationDownload() {
+        animationDownloadJob?.cancel()
+        animationDownloadJob = null
+        _animationModelsState.value = _animationModelsState.value.copy(
+            downloadingId = null,
+            downloadProgress = 0f
+        )
+    }
+
+    fun deleteAnimationStyle(context: Context, style: AnimationStyle) {
+        viewModelScope.launch(Dispatchers.IO) {
+            AnimationModelManager.deleteStyle(context, style)
+            val installed = AnimationModelManager.getInstalledStyleIds(context)
+            val totalBytes = AnimationModelManager.getTotalInstalledBytes(context)
+            withContext(Dispatchers.Main) {
+                _animationModelsState.value = _animationModelsState.value.copy(
+                    installedIds = installed,
+                    totalInstalledBytes = totalBytes
+                )
+                _processState.value = ProcessState.ToastMessage("Model ${style.displayName} dihapus")
+            }
+        }
+    }
+
+    fun deleteAllAnimationStyles(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            AnimationModelManager.deleteAllStyles(context)
+            withContext(Dispatchers.Main) {
+                _animationModelsState.value = AnimationModelsUiState()
+                _processState.value = ProcessState.ToastMessage("Semua model animasi dihapus")
+            }
+        }
+    }
+
+    fun runAnimationStylize(context: Context, style: AnimationStyle, strength: Float) {
         val src = bakedCurrentBitmap() ?: return
         viewModelScope.launch(Dispatchers.Default) {
-            _processState.value = ProcessState.Processing(0.3f, "Menerapkan gaya anime...")
-            try {
-                ImageEnhancerNative.initEngine(context)
-                val result = ImageEnhancerNative.animeStylize(src, styleMode, strength)
+            if (!AnimationModelManager.isInstalled(context, style)) {
                 withContext(Dispatchers.Main) {
-                    commitStructuralBitmap(result, "Gaya diterapkan")
+                    _processState.value = ProcessState.ToastMessage(
+                        "Unduh model ${style.displayName} terlebih dahulu",
+                        isError = true
+                    )
+                }
+                return@launch
+            }
+            _processState.value = ProcessState.Processing(0.3f, "Memproses ${style.displayName}...")
+            try {
+                val result = AnimationEngine.stylize(context, src, style, strength)
+                withContext(Dispatchers.Main) {
+                    commitStructuralBitmap(result, "${style.displayName} diterapkan")
                 }
             } catch (e: Exception) {
-                Log.e(tag, "Anime error: ${e.message}", e)
+                Log.e(tag, "Animation stylize error: ${e.message}", e)
                 withContext(Dispatchers.Main) {
-                    _processState.value = ProcessState.ToastMessage("Gagal memproses gaya anime", isError = true)
+                    _processState.value = ProcessState.ToastMessage(
+                        "Gagal memproses ${style.displayName}",
+                        isError = true
+                    )
                 }
             }
         }
@@ -689,27 +798,75 @@ class EnhancerViewModel : ViewModel() {
     }
 
     // -----------------------------------------------------------------------
-    // Collage Studio State
+    // Flexible Collage Studio State (1..9 Photos)
     // -----------------------------------------------------------------------
 
+    fun addCollagePhotos(bitmaps: List<Bitmap>) {
+        if (bitmaps.isEmpty()) return
+        val current = _collageCells.value.toMutableList()
+        val remaining = (MAX_COLLAGE_PHOTOS - current.size).coerceAtLeast(0)
+        bitmaps.take(remaining).forEach { bmp ->
+            current.add(CollageCellState(id = nextCollageCellId++, bitmap = bmp))
+        }
+        _collageCells.value = current
+    }
+
     fun addCollagePhoto(bitmap: Bitmap) {
-        val current = _collageBitmaps.value.toMutableList()
-        if (current.size < 4) {
-            current.add(bitmap)
-            _collageBitmaps.value = current
+        addCollagePhotos(listOf(bitmap))
+    }
+
+    fun replaceCollagePhoto(index: Int, bitmap: Bitmap) {
+        val current = _collageCells.value.toMutableList()
+        if (index in current.indices) {
+            current[index] = CollageCellState(id = nextCollageCellId++, bitmap = bitmap)
+            _collageCells.value = current
+        }
+    }
+
+    fun updateCollageCell(index: Int, transform: (CollageCellState) -> CollageCellState) {
+        val current = _collageCells.value.toMutableList()
+        if (index in current.indices) {
+            current[index] = transform(current[index])
+            _collageCells.value = current
+        }
+    }
+
+    fun swapCollageCells(fromIndex: Int, toIndex: Int) {
+        val current = _collageCells.value.toMutableList()
+        if (fromIndex in current.indices && toIndex in current.indices && fromIndex != toIndex) {
+            val tmp = current[fromIndex]
+            current[fromIndex] = current[toIndex]
+            current[toIndex] = tmp
+            _collageCells.value = current
+        }
+    }
+
+    fun rotateCollageCell(index: Int) {
+        updateCollageCell(index) { cell ->
+            cell.copy(
+                rotationDegrees = (cell.rotationDegrees + 90) % 360,
+                panX = 0f,
+                panY = 0f
+            )
+        }
+    }
+
+    fun resetCollageCell(index: Int) {
+        updateCollageCell(index) { cell ->
+            cell.copy(scale = 1f, panX = 0f, panY = 0f, rotationDegrees = 0)
         }
     }
 
     fun removeCollagePhotoAt(index: Int) {
-        val current = _collageBitmaps.value.toMutableList()
+        val current = _collageCells.value.toMutableList()
         if (index in current.indices) {
             current.removeAt(index)
-            _collageBitmaps.value = current
+            _collageCells.value = current
         }
     }
 
     fun clearCollage() {
-        _collageBitmaps.value = emptyList()
+        _collageCells.value = emptyList()
     }
 
     fun dismissToast() {
@@ -720,6 +877,8 @@ class EnhancerViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
+        animationDownloadJob?.cancel()
+        AnimationEngine.releaseAll()
         ImageEnhancerNative.releaseMemory()
     }
 }

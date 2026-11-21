@@ -8,7 +8,6 @@ static AAssetManager* g_asset_manager = nullptr;
 static ncnn::Net* g_sr_net = nullptr;      // realesr-general-x4v3 (4x SR)
 static ncnn::Net* g_wdn_net = nullptr;     // realesr-general-wdn-x4v3 (Denoise 4x SR)
 static ncnn::Net* g_scrfd_net = nullptr;   // scrfd_500m_kps-opt2 (Face & 5-Point Landmarks)
-static ncnn::Net* g_anime_net = nullptr;   // face_paint_512_v2 (AnimeGANv2)
 static ncnn::Net* g_matting_net = nullptr; // modnet_matting (Portrait Hair Alpha Matting)
 static ncnn::Net* g_depth_net = nullptr;   // dpt256 (Monocular Depth Map)
 #endif
@@ -152,9 +151,6 @@ static void evictHeavyModelsExcept(const char* keep) {
     if (std::strcmp(keep, "matting") != 0 && g_matting_net) {
         delete g_matting_net; g_matting_net = nullptr;
     }
-    if (std::strcmp(keep, "anime") != 0 && g_anime_net) {
-        delete g_anime_net; g_anime_net = nullptr;
-    }
 }
 
 static ncnn::Net* ensureSrNet() {
@@ -168,11 +164,6 @@ static ncnn::Net* ensureWdnNet() {
 static ncnn::Net* ensureScrfdNet() {
     loadNcnnNet(g_scrfd_net, "models/scrfd_500m_kps-opt2.param", "models/scrfd_500m_kps-opt2.bin");
     return g_scrfd_net;
-}
-static ncnn::Net* ensureAnimeNet() {
-    evictHeavyModelsExcept("anime");
-    loadNcnnNet(g_anime_net, "models/face_paint_512_v2.param", "models/face_paint_512_v2.bin");
-    return g_anime_net;
 }
 static ncnn::Net* ensureMattingNet() {
     evictHeavyModelsExcept("matting");
@@ -189,7 +180,6 @@ static void releaseAllNcnnNetsLocked() {
     delete g_sr_net;      g_sr_net = nullptr;
     delete g_wdn_net;     g_wdn_net = nullptr;
     delete g_scrfd_net;   g_scrfd_net = nullptr;
-    delete g_anime_net;   g_anime_net = nullptr;
     delete g_matting_net; g_matting_net = nullptr;
     delete g_depth_net;   g_depth_net = nullptr;
 }
@@ -1926,80 +1916,6 @@ void animeStylize(const uint32_t* src, uint32_t* dst, int width, int height, int
     const int total = width * height;
     const float mix = std::clamp(strength, 0.0f, 1.0f);
     std::vector<uint32_t> stylized(total);
-    bool usedAnimeGan = false;
-
-    if (styleMode != 2) {
-#if USE_NCNN
-        std::lock_guard<std::mutex> lock(g_model_mutex);
-        ncnn::Net* animeNet = ensureAnimeNet();
-        if (animeNet) {
-            std::vector<unsigned char> rgbIn(total * 3);
-            for (int i = 0; i < total; ++i) {
-                uint32_t p = src[i];
-                rgbIn[i * 3 + 0] = (p >> 16) & 0xFF;
-                rgbIn[i * 3 + 1] = (p >> 8) & 0xFF;
-                rgbIn[i * 3 + 2] = p & 0xFF;
-            }
-
-            // Preserve exact aspect ratio via letterbox padding to 512x512 (fixes squashed portraits!)
-            const int targetSize = 512;
-            int w = width, h = height;
-            if (w > h) {
-                float s = static_cast<float>(targetSize) / w;
-                w = targetSize;
-                h = std::max(1, static_cast<int>(h * s));
-            } else {
-                float s = static_cast<float>(targetSize) / h;
-                h = targetSize;
-                w = std::max(1, static_cast<int>(w * s));
-            }
-
-            ncnn::Mat inResized = ncnn::Mat::from_pixels_resize(rgbIn.data(), ncnn::Mat::PIXEL_RGB, width, height, w, h);
-            int wpad = targetSize - w, hpad = targetSize - h;
-            int padTop = hpad / 2, padBottom = hpad - padTop;
-            int padLeft = wpad / 2, padRight = wpad - padLeft;
-
-            ncnn::Mat inPad;
-            ncnn::copy_make_border(inResized, inPad, padTop, padBottom, padLeft, padRight, ncnn::BORDER_REPLICATE, 0.0f);
-
-            const float meanVals[3] = {127.5f, 127.5f, 127.5f};
-            const float normVals[3] = {1.0f / 127.5f, 1.0f / 127.5f, 1.0f / 127.5f};
-            inPad.substract_mean_normalize(meanVals, normVals);
-
-            ncnn::Extractor ex = animeNet->create_extractor();
-            ex.input("input", inPad);
-            ncnn::Mat outMat;
-            if (ex.extract("out", outMat) == 0 && outMat.w >= targetSize && outMat.h >= targetSize && outMat.c >= 3) {
-                // Crop out the padded borders before resizing back to original aspect ratio
-                ncnn::Mat cropped(w, h, 3);
-                for (int c = 0; c < 3; ++c) {
-                    const ncnn::Mat srcC = outMat.channel(c);
-                    ncnn::Mat dstC = cropped.channel(c);
-                    for (int y = 0; y < h; ++y) {
-                        const float* sRow = srcC.row(padTop + y) + padLeft;
-                        std::memcpy(dstC.row(y), sRow, w * sizeof(float));
-                    }
-                }
-
-                ncnn::Mat outFull;
-                ncnn::resize_bilinear(cropped, outFull, width, height);
-                const float* chR = outFull.channel(0);
-                const float* chG = outFull.channel(1);
-                const float* chB = outFull.channel(2);
-
-                #pragma omp parallel for schedule(static)
-                for (int i = 0; i < total; ++i) {
-                    uint32_t a = (src[i] >> 24) & 0xFF;
-                    float r = (chR[i] + 1.0f) * 127.5f;
-                    float g = (chG[i] + 1.0f) * 127.5f;
-                    float b = (chB[i] + 1.0f) * 127.5f;
-                    stylized[i] = (a << 24) | (clamp8(r) << 16) | (clamp8(g) << 8) | clamp8(b);
-                }
-                usedAnimeGan = true;
-            }
-        }
-#endif
-    }
 
     if (styleMode == 2) {
         // Mode 2: Clean Pencil / Ink Sketch (color-dodge Difference-of-Gaussians on luminance)
@@ -2028,10 +1944,8 @@ void animeStylize(const uint32_t* src, uint32_t* dst, int width, int height, int
         return;
     }
 
-    if (!usedAnimeGan) {
-        // Clean bilateral fallback when NCNN isn't loaded (e.g. JVM unit tests)
-        bilateralDenoise(src, stylized.data(), width, height, 3.5f, 22.0f);
-    }
+    // Lightweight offline bilateral fallback (on-demand TFLite AnimationEngine handles neural styles)
+    bilateralDenoise(src, stylized.data(), width, height, 3.5f, 22.0f);
 
     if (styleMode == 1) {
         // Mode 1: Ilustrasi — AnimeGANv2 + crisp subtle ink lines + gentle vibrancy

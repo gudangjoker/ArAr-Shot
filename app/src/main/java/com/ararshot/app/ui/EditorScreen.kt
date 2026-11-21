@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.BlurOn
@@ -70,12 +71,13 @@ import com.ararshot.app.engine.BgReplaceMode
 import com.ararshot.app.engine.ImageUtils
 import com.ararshot.app.model.ColorAdjustments
 import com.ararshot.app.model.EditorTool
+import com.ararshot.app.ui.components.AnimationModelManagerSheet
 import com.ararshot.app.ui.components.InpaintBrushView
 import com.ararshot.app.ui.components.InteractiveCropCanvas
 import com.ararshot.app.ui.components.PhotoPreviewCanvas
 import com.ararshot.app.ui.components.centeredCropRectForAspect
 import com.ararshot.app.ui.editor.AdjustPanel
-import com.ararshot.app.ui.editor.AnimePanel
+import com.ararshot.app.ui.editor.AnimationPanel
 import com.ararshot.app.ui.editor.BackgroundPanel
 import com.ararshot.app.ui.editor.BokehPanel
 import com.ararshot.app.ui.editor.CropAspectOption
@@ -108,9 +110,15 @@ fun EditorScreen(
     val inpaintMask by viewModel.inpaintMask.collectAsState()
     val canUndo by viewModel.canUndo.collectAsState()
     val canRedo by viewModel.canRedo.collectAsState()
+    val animationModelsState by viewModel.animationModelsState.collectAsState()
 
     var splitCompare by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
+    var showModelManagerSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshAnimationModels(context)
+    }
 
     // Interactive Crop state
     var cropAspect by remember { mutableStateOf(CropAspectOption.FREE) }
@@ -396,9 +404,15 @@ fun EditorScreen(
                             maskRevision++
                         }
                     )
-                    EditorTool.ANIME -> AnimePanel(
+                    EditorTool.ANIMATION -> AnimationPanel(
+                        modelsState = animationModelsState,
+                        onDownloadStyle = { style ->
+                            viewModel.downloadAnimationStyle(context, style)
+                        },
+                        onCancelDownload = { viewModel.cancelAnimationDownload() },
+                        onOpenModelManager = { showModelManagerSheet = true },
                         onApply = { style, str ->
-                            viewModel.runAnimeStylize(context, style, str)
+                            viewModel.runAnimationStylize(context, style, str)
                         }
                     )
                     EditorTool.TEXT -> TextPanel(
@@ -482,6 +496,16 @@ fun EditorScreen(
             }
         )
     }
+    if (showModelManagerSheet) {
+        AnimationModelManagerSheet(
+            state = animationModelsState,
+            onDownload = { style -> viewModel.downloadAnimationStyle(context, style) },
+            onCancelDownload = { viewModel.cancelAnimationDownload() },
+            onDelete = { style -> viewModel.deleteAnimationStyle(context, style) },
+            onDeleteAll = { viewModel.deleteAllAnimationStyles(context) },
+            onDismiss = { showModelManagerSheet = false }
+        )
+    }
 }
 
 private fun toolIcon(tool: EditorTool): ImageVector = when (tool) {
@@ -492,7 +516,7 @@ private fun toolIcon(tool: EditorTool): ImageVector = when (tool) {
     EditorTool.BACKGROUND -> Icons.Default.ContentCut
     EditorTool.BOKEH -> Icons.Default.BlurOn
     EditorTool.ERASE -> Icons.Default.Healing
-    EditorTool.ANIME -> Icons.Default.AutoAwesome
+    EditorTool.ANIMATION -> Icons.Default.Animation
     EditorTool.TEXT -> Icons.Default.Title
     EditorTool.PASSPORT -> Icons.Default.Badge
 }
