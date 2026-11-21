@@ -97,13 +97,30 @@ object AnimationEngine {
         source: Bitmap,
         style: AnimationStyle
     ): Bitmap {
-        ensureDctInterpretersLoaded(context, style)
+        return try {
+            runDctNetInternal(context, source, style, forceCpu = false)
+        } catch (t: Throwable) {
+            if (cachedGpuDelegates.isNotEmpty()) {
+                Log.w(TAG, "DCT-Net GPU run failed (${t.message}), retrying on CPU XNNPACK")
+                releaseAll()
+                runDctNetInternal(context, source, style, forceCpu = true)
+            } else {
+                throw t
+            }
+        }
+    }
+
+    private fun runDctNetInternal(
+        context: Context,
+        source: Bitmap,
+        style: AnimationStyle,
+        forceCpu: Boolean
+    ): Bitmap {
+        ensureDctInterpretersLoaded(context, style, forceCpu)
         val bgInterp = cachedBgInterpreter ?: error("Gagal memuat model ${style.displayName}")
         val headInterp = cachedHeadInterpreter
 
-        val bgShape = bgInterp.getInputTensor(0).shape() // [1, 720, 720, 3]
-        val bgH = if (bgShape.size >= 3 && bgShape[1] > 0) bgShape[1] else 720
-        val bgW = if (bgShape.size >= 3 && bgShape[2] > 0) bgShape[2] else 720
+        val (bgW, bgH) = extractSpatialDims(bgInterp.getInputTensor(0).shape(), fallbackW = 720, fallbackH = 720)
 
         // Stage 1: Full-scene animation with aspect-ratio preserving edge-replicated padding
         val padded = createLetterboxedPaddedBitmap(source, bgW, bgH)
@@ -139,16 +156,20 @@ object AnimationEngine {
 
             if (faces.isNotEmpty()) {
                 val headAlpha = loadOrBuildHeadAlphaMask(context)
-                val headShape = headInterp.getInputTensor(0).shape()
-                val hSize = if (headShape.size >= 3 && headShape[1] > 0) headShape[1] else DCT_HEAD_SIZE
+                val (headW, headH) = extractSpatialDims(
+                    headInterp.getInputTensor(0).shape(),
+                    fallbackW = DCT_HEAD_SIZE,
+                    fallbackH = DCT_HEAD_SIZE
+                )
 
                 for (face in faces.take(6)) {
                     val srcPts = Array(5) { k ->
                         floatArrayOf(face.landmarks[k * 2], face.landmarks[k * 2 + 1])
                     }
-                    val scaleRef = hSize / DCT_HEAD_SIZE.toFloat()
+                    val scaleRefX = headW / DCT_HEAD_SIZE.toFloat()
+                    val scaleRefY = headH / DCT_HEAD_SIZE.toFloat()
                     val refPts = Array(5) { k ->
-                        floatArrayOf(DCT_REF_PTS[k][0] * scaleRef, DCT_REF_PTS[k][1] * scaleRef)
+                        floatArrayOf(DCT_REF_PTS[k][0] * scaleRefX, DCT_REF_PTS[k][1] * scaleRefY)
                     }
                     val fwdVals = computeSimilarityMatrixValues(srcPts, refPts) ?: continue
 
@@ -157,7 +178,7 @@ object AnimationEngine {
                     if (!fwdMatrix.invert(invMatrix)) continue
 
                     // Warp source face cleanly onto canonical 288x288 canvas
-                    val headCrop = Bitmap.createBitmap(hSize, hSize, Bitmap.Config.ARGB_8888)
+                    val headCrop = Bitmap.createBitmap(headW, headH, Bitmap.Config.ARGB_8888)
                     val cropCanvas = Canvas(headCrop)
                     cropCanvas.drawColor(android.graphics.Color.WHITE)
                     val filterPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -191,12 +212,29 @@ object AnimationEngine {
         source: Bitmap,
         style: AnimationStyle
     ): Bitmap {
-        ensureSingleInterpreterLoaded(context, style)
+        return try {
+            runWhiteboxCartoonInternal(context, source, style, forceCpu = false)
+        } catch (t: Throwable) {
+            if (cachedGpuDelegates.isNotEmpty()) {
+                Log.w(TAG, "Whitebox GPU run failed (${t.message}), retrying on CPU XNNPACK")
+                releaseAll()
+                runWhiteboxCartoonInternal(context, source, style, forceCpu = true)
+            } else {
+                throw t
+            }
+        }
+    }
+
+    private fun runWhiteboxCartoonInternal(
+        context: Context,
+        source: Bitmap,
+        style: AnimationStyle,
+        forceCpu: Boolean
+    ): Bitmap {
+        ensureSingleInterpreterLoaded(context, style, forceCpu)
         val interp = cachedBgInterpreter ?: error("Gagal memuat model ${style.displayName}")
 
-        val shape = interp.getInputTensor(0).shape() // [1, 512, 512, 3]
-        val inH = if (shape.size >= 3 && shape[1] > 0) shape[1] else 512
-        val inW = if (shape.size >= 3 && shape[2] > 0) shape[2] else 512
+        val (inW, inH) = extractSpatialDims(interp.getInputTensor(0).shape(), fallbackW = 512, fallbackH = 512)
 
         val padded = createLetterboxedPaddedBitmap(source, inW, inH)
         val rawOut = runTfliteBgr(
@@ -220,46 +258,48 @@ object AnimationEngine {
         return result
     }
 
-    private fun ensureDctInterpretersLoaded(context: Context, style: AnimationStyle) {
-        if (cachedStyleId == style.id && cachedBgInterpreter != null) return
+    private fun ensureDctInterpretersLoaded(context: Context, style: AnimationStyle, forceCpu: Boolean = false) {
+        if (cachedStyleId == style.id && cachedBgInterpreter != null && (!forceCpu || cachedGpuDelegates.isEmpty())) return
         releaseAll()
         val bgFile = AnimationModelManager.modelFile(context, style, style.files[0].fileName)
         val headFile = AnimationModelManager.modelFile(context, style, style.files[1].fileName)
-        cachedBgInterpreter = createInterpreter(bgFile)
-        cachedHeadInterpreter = createInterpreter(headFile)
+        cachedBgInterpreter = createInterpreter(bgFile, forceCpu)
+        cachedHeadInterpreter = createInterpreter(headFile, forceCpu)
         cachedStyleId = style.id
     }
 
-    private fun ensureSingleInterpreterLoaded(context: Context, style: AnimationStyle) {
-        if (cachedStyleId == style.id && cachedBgInterpreter != null) return
+    private fun ensureSingleInterpreterLoaded(context: Context, style: AnimationStyle, forceCpu: Boolean = false) {
+        if (cachedStyleId == style.id && cachedBgInterpreter != null && (!forceCpu || cachedGpuDelegates.isEmpty())) return
         releaseAll()
         val modelFile = AnimationModelManager.modelFile(context, style, style.files[0].fileName)
-        cachedBgInterpreter = createInterpreter(modelFile)
+        cachedBgInterpreter = createInterpreter(modelFile, forceCpu)
         cachedStyleId = style.id
     }
 
-    private fun createInterpreter(file: File): Interpreter {
+    private fun createInterpreter(file: File, forceCpu: Boolean = false): Interpreter {
         val mapped = mapFileReadOnly(file)
-        // Try GPU delegate first when supported; fall back transparently to XNNPACK CPU
-        try {
-            val compat = CompatibilityList()
-            if (compat.isDelegateSupportedOnThisDevice) {
-                val gpuDelegate = GpuDelegate(compat.bestOptionsForThisDevice)
-                try {
-                    val opts = Interpreter.Options().apply {
-                        addDelegate(gpuDelegate)
-                        setNumThreads(4)
+        if (!forceCpu) {
+            // Try GPU delegate first when supported; fall back transparently to XNNPACK CPU
+            try {
+                val compat = CompatibilityList()
+                if (compat.isDelegateSupportedOnThisDevice) {
+                    val gpuDelegate = GpuDelegate(compat.bestOptionsForThisDevice)
+                    try {
+                        val opts = Interpreter.Options().apply {
+                            addDelegate(gpuDelegate)
+                            setNumThreads(4)
+                        }
+                        val interp = Interpreter(mapped, opts)
+                        cachedGpuDelegates.add(gpuDelegate)
+                        return interp
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "GPU delegate failed for ${file.name}, falling back to CPU XNNPACK: ${t.message}")
+                        try { gpuDelegate.close() } catch (_: Exception) {}
                     }
-                    val interp = Interpreter(mapped, opts)
-                    cachedGpuDelegates.add(gpuDelegate)
-                    return interp
-                } catch (t: Throwable) {
-                    Log.w(TAG, "GPU delegate failed for ${file.name}, falling back to CPU XNNPACK: ${t.message}")
-                    try { gpuDelegate.close() } catch (_: Exception) {}
                 }
+            } catch (t: Throwable) {
+                Log.w(TAG, "GPU compatibility probe skipped: ${t.message}")
             }
-        } catch (t: Throwable) {
-            Log.w(TAG, "GPU compatibility probe skipped: ${t.message}")
         }
 
         val cpuOpts = Interpreter.Options().apply {
@@ -315,9 +355,11 @@ object AnimationEngine {
         }
         inputBuf.rewind()
 
-        val outShape = interpreter.getOutputTensor(0).shape()
-        val outH = if (outShape.size >= 3 && outShape[1] > 0) outShape[1] else h
-        val outW = if (outShape.size >= 3 && outShape[2] > 0) outShape[2] else w
+        val (outW, outH) = extractSpatialDims(
+            interpreter.getOutputTensor(0).shape(),
+            fallbackW = w,
+            fallbackH = h
+        )
         val outCount = outW * outH
 
         val outputBuf = ByteBuffer.allocateDirect(outCount * 3 * 4).order(ByteOrder.nativeOrder())
@@ -420,6 +462,25 @@ object AnimationEngine {
         }
         return Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply {
             setPixels(pixels, 0, w, 0, 0, w, h)
+        }
+    }
+
+    /**
+     * Extracts `(width, height)` from either 3D `[H, W, C]` (DCT-Net) or 4D `[1, H, W, C]` (White-box) TFLite shapes.
+     */
+    internal fun extractSpatialDims(shape: IntArray, fallbackW: Int, fallbackH: Int): Pair<Int, Int> {
+        return when (shape.size) {
+            4 -> {
+                val h = if (shape[1] > 0) shape[1] else fallbackH
+                val w = if (shape[2] > 0) shape[2] else fallbackW
+                Pair(w, h)
+            }
+            3 -> {
+                val h = if (shape[0] > 0) shape[0] else fallbackH
+                val w = if (shape[1] > 0) shape[1] else fallbackW
+                Pair(w, h)
+            }
+            else -> Pair(fallbackW, fallbackH)
         }
     }
 

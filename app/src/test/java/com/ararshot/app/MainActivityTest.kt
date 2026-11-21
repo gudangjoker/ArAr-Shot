@@ -246,6 +246,11 @@ class MainActivityTest {
         assertEquals(128, lb.activeH)
         assertEquals(64, lb.padTop)
 
+        // Verify 3D [H, W, C] (DCT-Net) and 4D [1, H, W, C] (White-box) tensor shape parsing
+        assertEquals(Pair(720, 720), AnimationEngine.extractSpatialDims(intArrayOf(720, 720, 3), 512, 512))
+        assertEquals(Pair(288, 288), AnimationEngine.extractSpatialDims(intArrayOf(288, 288, 3), 256, 256))
+        assertEquals(Pair(512, 512), AnimationEngine.extractSpatialDims(intArrayOf(1, 512, 512, 3), 256, 256))
+
         // Verify all 7 non-anime animation styles are defined with valid URLs
         assertEquals(7, AnimationStyle.entries.size)
         assertTrue(AnimationStyle.entries.all { it.files.isNotEmpty() && it.totalApproxBytes > 1_000_000L })
