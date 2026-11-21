@@ -35,6 +35,7 @@ object ArArColors {
     val Accent = Color(0xFF7C5CFF)
     val AccentCyan = Color(0xFF22D3EE)
     val Danger = Color(0xFFEF4444)
+    val Warning = Color(0xFFFBBF24)
     val Success = Color(0xFF10B981)
 
     val BrandGradient: Brush

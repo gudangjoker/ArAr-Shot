@@ -237,7 +237,7 @@ fun CollageStudioScreen(
                 val ok = ImageUtils.saveBitmapToGallery(
                     context = context,
                     bitmap = rendered,
-                    displayNamePrefix = "ArArShot_Collage_${System.currentTimeMillis()}"
+                    title = "ArArShot_Collage_${System.currentTimeMillis()}"
                 )
                 withContext(Dispatchers.Main) {
                     isExporting = false
